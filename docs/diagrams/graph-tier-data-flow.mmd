@@ -1,0 +1,91 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#d5e8d4', 'lineColor': '#82b366'}}}%%
+flowchart TB
+    subgraph OBS_GRAPH["Observability -- Service Dependency Graph"]
+        direction TB
+        OBS_Q["SELECT s.service_id, d.depends_on<br/>FROM obs_services s<br/>JOIN obs_dependencies d<br/>ON s.service_id = d.service_id"]
+
+        GW(("svc-gateway"))
+        PAY(("svc-payments")):::alert
+        ORD(("svc-orders"))
+        PG_OBS(("svc-postgres"))
+        RED(("svc-redis"))
+
+        GW -->|depends_on| PAY
+        GW -->|depends_on| ORD
+        PAY -->|depends_on| PG_OBS
+        ORD -->|depends_on| RED
+
+        OBS_TBL["Tables: obs_services + obs_dependencies"]
+    end
+
+    subgraph TELCO_GRAPH["Telco -- Network Topology Graph"]
+        direction TB
+        TELCO_Q["SELECT e.element_id, c.peer_id<br/>FROM telco_elements e<br/>JOIN telco_connections c<br/>ON e.element_id = c.element_id"]
+
+        CR["core-rtr-01"]:::alert
+        AGG1["agg-sw-01"]
+        AGG2["agg-sw-02"]
+        ACC1["access-01"]
+        ACC2["access-02"]
+
+        CR -->|10G| AGG1
+        CR -->|10G| AGG2
+        AGG1 --> ACC1
+        AGG1 --> ACC2
+
+        TELCO_TBL["Tables: telco_elements + telco_connections"]
+    end
+
+    subgraph SEC_GRAPH["Cybersecurity -- User-Asset Access Graph"]
+        direction TB
+        SEC_Q["SELECT u.user_id, a.asset_id, ac.protocol<br/>FROM sec_users u<br/>JOIN sec_access ac ON u.user_id = ac.user_id<br/>JOIN sec_assets a ON ac.asset_id = a.asset_id"]
+
+        U1["admin-01"]
+        U2["dev-02"]
+        A1[("prod-db-01")]
+        A2["staging-app"]
+        VPN["vpn-gw"]:::alert
+
+        U1 -->|ssh| A1
+        U1 -->|rdp| VPN
+        U2 -->|https| A2
+        U2 -->|vpn| VPN
+
+        SEC_TBL["Tables: sec_assets + sec_users + sec_access"]
+    end
+
+    AGENT["AI Agent<br/>(CLI Cookbook)"]
+    TOOL["run_select_query<br/>via shared/client.py"]
+
+    AGENT --> TOOL
+    TOOL --> CH_JOIN
+    TOOL -.-> PG_GRAPH
+
+    CH_JOIN[("ClickHouse<br/>SQL JOINs")]
+    PG_GRAPH{{"PuppyGraph<br/>Gremlin / Cypher<br/>(optional)"}}
+
+    CH_JOIN --> OBS_GRAPH
+    CH_JOIN --> TELCO_GRAPH
+    CH_JOIN --> SEC_GRAPH
+
+    subgraph PATTERN["GRAPH Tier Interaction Pattern"]
+        direction TB
+        G1["1. Agent identifies affected service/element from HOT or WARM tier"]
+        G2["2. Queries dependency/connection tables via SQL JOINs for blast radius"]
+        G3["3. Traverses upstream/downstream dependencies to scope root cause"]
+        G4["4. Combines topology context with HOT/WARM findings for full diagnosis"]
+        G1 --> G2 --> G3 --> G4
+    end
+
+    NOTE["Characteristics:<br/>- Latency: 10-100ms<br/>- SQL JOINs for relationship traversal<br/>- PuppyGraph optional for Gremlin/Cypher<br/>- Zero-copy from ClickHouse tables"]
+
+    classDef alert fill:#f8cecc,stroke:#b85450,font-weight:bold
+    style AGENT fill:#e1d5e7,stroke:#9673a6
+    style TOOL fill:#fff2cc,stroke:#d6b656
+    style CH_JOIN fill:#f0f0f0,stroke:#333
+    style PG_GRAPH fill:#d5e8d4,stroke:#82b366
+    style OBS_GRAPH fill:#d5e8d4,stroke:#82b366
+    style TELCO_GRAPH fill:#d5e8d4,stroke:#82b366
+    style SEC_GRAPH fill:#d5e8d4,stroke:#82b366
+    style PATTERN fill:#f5f5f5,stroke:#ccc
+    style NOTE fill:#f5f5f5,stroke:#ccc,text-align:left

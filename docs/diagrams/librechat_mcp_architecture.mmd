@@ -1,0 +1,54 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#dae8fc', 'lineColor': '#666'}}}%%
+flowchart TB
+    subgraph PROVIDERS["LLM Providers"]
+        GEM["Google Gemini<br/>(default)"]
+        OAI["OpenAI"]
+        ANT["Anthropic"]
+        OLL["Ollama (local)"]
+    end
+
+    subgraph UI["LibreChat UI (http://localhost:3080)"]
+        CHAT["Chat + Agents panel"]
+        SPECS["modelSpecs presets<br/>SRE / NetOps / SOC"]
+        AGENTS["Agents builder<br/>(MCP tool binding)"]
+    end
+
+    PROVIDERS --> UI
+
+    subgraph MCP["Memory MCP server (streamable-http, :8765)"]
+        direction TB
+        T1["memory_hot_scan"]
+        T2["memory_hot_workspace"]
+        T3["memory_warm_search"]
+        T4["memory_warm_lookup"]
+        T5["memory_graph_traverse"]
+    end
+
+    UI -->|"tool call over HTTP"| MCP
+
+    subgraph DATA["Enterprise Memory cluster"]
+        direction TB
+        HOT[("HOT Memory Engine<br/>event streams + workspaces")]
+        WARM[("WARM MergeTree + cosineDistance<br/>historical incidents + threat intel")]
+        GRAPH[("GRAPH SQL JOINs / PuppyGraph<br/>deps / topology / access")]
+    end
+
+    MCP --> HOT
+    MCP --> WARM
+    MCP --> GRAPH
+
+    subgraph CLI["CLI cookbook runner (parallel entry point)"]
+        SREA["observability"]
+        NET["telco"]
+        SOC["cybersecurity"]
+    end
+
+    CLI --> HOT
+    CLI --> WARM
+    CLI --> GRAPH
+
+    style UI fill:#e1d5e7,stroke:#9673a6
+    style MCP fill:#fff2cc,stroke:#d6b656
+    style DATA fill:#f5f5f5,stroke:#999
+    style CLI fill:#d5e8d4,stroke:#82b366
+    style PROVIDERS fill:#f5f5f5,stroke:#999

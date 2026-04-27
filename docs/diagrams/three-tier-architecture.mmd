@@ -1,0 +1,84 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#dae8fc', 'primaryTextColor': '#333', 'lineColor': '#666'}}}%%
+graph TB
+    subgraph AGENT["AI Agent (CLI Cookbook Runner)"]
+        direction LR
+        SRE["SRE Agent<br/>Observability"]
+        NETOPS["NetOps Agent<br/>Telco"]
+        SOC["SOC Agent<br/>Cybersecurity"]
+    end
+
+    AGENT -->|"Step 1-2: Live data + workspace"| HOT
+    AGENT -->|"Step 3-5: Vector search + playbook"| WARM
+    AGENT -->|"Step 4: Dependency/topology traversal"| GRAPH
+
+    subgraph HOT["HOT MEMORY -- ClickHouse Memory Engine"]
+        direction TB
+        HOT_DESC["sub-5ms latency | volatile on restart"]
+        style HOT_DESC fill:none,stroke:none,color:#999
+
+        subgraph HOT_OBS["Observability"]
+            OES["obs_events_stream"]
+            OIW["obs_incident_workspace"]
+        end
+        subgraph HOT_TELCO["Telco"]
+            TNS["telco_network_state"]
+            TFW["telco_fault_workspace"]
+        end
+        subgraph HOT_SEC["Cybersecurity"]
+            SES["sec_events_stream"]
+            SCW["sec_case_workspace"]
+        end
+    end
+
+    subgraph WARM["WARM MEMORY -- MergeTree + cosineDistance Vector Search"]
+        direction TB
+        WARM_DESC["50-500ms latency | persistent | 768-dim embeddings"]
+        style WARM_DESC fill:none,stroke:none,color:#999
+
+        OHI["obs_historical_incidents"]
+        TNE["telco_network_events"]
+        SHI["sec_historical_incidents"]
+        STI["sec_threat_intel"]
+    end
+
+    subgraph GRAPH["GRAPH MEMORY -- SQL JOINs / PuppyGraph"]
+        direction TB
+        GRAPH_DESC["10-100ms latency | relationship traversal"]
+        style GRAPH_DESC fill:none,stroke:none,color:#999
+
+        subgraph GRAPH_OBS["Observability"]
+            OS["obs_services"]
+            OD["obs_dependencies"]
+        end
+        subgraph GRAPH_TELCO["Telco"]
+            TE["telco_elements"]
+            TC["telco_connections"]
+        end
+        subgraph GRAPH_SEC["Cybersecurity"]
+            SA["sec_assets"]
+            SU["sec_users"]
+            SAC["sec_access"]
+        end
+    end
+
+    HOT --> CH
+    WARM --> CH
+    GRAPH --> CH
+    GRAPH -.->|"optional"| PG
+
+    CH[("ClickHouse 24<br/>Single Unified Engine")]
+    PG{{"PuppyGraph<br/>Virtual Graph Layer"}}
+
+    style AGENT fill:#e1d5e7,stroke:#9673a6,color:#333
+    style HOT fill:#f8cecc,stroke:#b85450
+    style WARM fill:#dae8fc,stroke:#6c8ebf
+    style GRAPH fill:#d5e8d4,stroke:#82b366
+    style CH fill:#f0f0f0,stroke:#333
+    style PG fill:#d5e8d4,stroke:#82b366
+
+    style HOT_OBS fill:#fff,stroke:#b85450
+    style HOT_TELCO fill:#fff,stroke:#b85450
+    style HOT_SEC fill:#fff,stroke:#b85450
+    style GRAPH_OBS fill:#fff,stroke:#82b366
+    style GRAPH_TELCO fill:#fff,stroke:#82b366
+    style GRAPH_SEC fill:#fff,stroke:#82b366

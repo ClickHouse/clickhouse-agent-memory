@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enterprise Agent Memory -- Session report</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ch-yellow: #FAFF69;
+    --ch-yellow-ink: #1E1E1E;
+    --ch-red: #FC2424;
+    --ch-purple: #8430CE;
+    --ch-bg: #0F0F10;
+    --ch-panel: #17171A;
+    --ch-panel-2: #1F1F24;
+    --ch-border: #2A2A32;
+    --ch-text: #F5F5F7;
+    --ch-muted: #9CA0AD;
+    --ch-good: #34A853;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+           'Helvetica Neue', Arial, sans-serif;
+    --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace,
+           SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--ch-bg); color: var(--ch-text); }
+  body {
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--ch-yellow); text-decoration: none; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+  /* Top bar (brand strip) */
+  header.top {
+    background: var(--ch-bg);
+    border-bottom: 1px solid var(--ch-border);
+    padding: 18px 32px;
+  }
+  header.top .inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  .brand .block-red, .brand .block-yellow {
+    display: inline-block; width: 10px; height: 18px; border-radius: 2px;
+  }
+  .brand .block-red { background: var(--ch-red); }
+  .brand .block-yellow { background: var(--ch-yellow); }
+  .meta-chips { display: flex; gap: 12px; font-size: 12px; color: var(--ch-muted); }
+  .meta-chips span { font-family: var(--mono); }
+
+  /* Hero */
+  .hero { padding: 72px 0 48px; }
+  .hero .eyebrow {
+    font-size: 12px; color: var(--ch-yellow);
+    text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-size: 44px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.1; margin-bottom: 24px;
+  }
+  .hero h1 .question {
+    font-family: var(--mono); font-size: 24px; font-weight: 500;
+    color: var(--ch-muted); display: block; margin-top: 8px;
+  }
+  .hero .subtitle { color: var(--ch-muted); font-size: 16px; max-width: 780px; }
+
+  /* Scorecard */
+  section.scorecard { padding: 32px 0 48px; }
+  .scorecard h2 {
+    font-size: 13px; font-weight: 600; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin-bottom: 20px;
+  }
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    margin-bottom: 28px;
+  }
+  .kpi {
+    background: var(--ch-panel); border: 1px solid var(--ch-border);
+    border-radius: 4px; padding: 24px;
+    position: relative; overflow: hidden;
+  }
+  .kpi.hero-kpi { border-top: 3px solid var(--ch-yellow); }
+  .kpi-value {
+    font-family: var(--mono); font-size: 32px; font-weight: 600;
+    color: var(--ch-text); letter-spacing: -0.01em;
+  }
+  .kpi-value .unit { font-size: 14px; color: var(--ch-muted); margin-left: 4px; }
+  .kpi-label {
+    font-size: 11px; color: var(--ch-muted); text-transform: uppercase;
+    letter-spacing: 0.12em; margin-top: 8px;
+  }
+  .kpi-note {
+    font-size: 12px; color: var(--ch-muted); margin-top: 6px;
+  }
+  .scorecard-narrative {
+    background: var(--ch-panel); border-left: 3px solid var(--ch-yellow);
+    padding: 20px 24px; font-size: 15px; color: var(--ch-text);
+    border-radius: 0 4px 4px 0;
+  }
+  .scorecard-narrative strong { color: var(--ch-yellow); }
+
+  /* Steps */
+  section.steps { padding: 32px 0 48px; }
+  section.steps h2 {
+    font-size: 13px; font-weight: 600; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin-bottom: 24px;
+  }
+  article.step {
+    background: var(--ch-panel); border: 1px solid var(--ch-border);
+    border-left: 3px solid var(--ch-border);
+    border-radius: 4px; padding: 28px; margin-bottom: 20px;
+  }
+  article.step.hot   { border-left-color: var(--ch-red); }
+  article.step.warm  { border-left-color: var(--ch-purple); }
+  article.step.graph { border-left-color: var(--ch-yellow); }
+  article.step.empty { opacity: 0.92; }
+  .step-header {
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .step-number {
+    font-family: var(--mono); font-size: 11px; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+  }
+  .step-label {
+    font-size: 20px; font-weight: 600; color: var(--ch-text);
+  }
+  .tier-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 3px 8px; border-radius: 3px;
+    border: 1px solid var(--ch-border); color: var(--ch-muted);
+  }
+  .tier-chip .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; background: var(--ch-muted);
+  }
+  .tier-chip.hot .dot   { background: var(--ch-red); }
+  .tier-chip.warm .dot  { background: var(--ch-purple); }
+  .tier-chip.graph .dot { background: var(--ch-yellow); }
+  .step-latency {
+    font-family: var(--mono); font-size: 13px; color: var(--ch-muted);
+    margin-left: auto;
+  }
+  .step-latency b { color: var(--ch-yellow); font-weight: 600; }
+
+  .step-section { margin-top: 18px; }
+  .step-section h4 {
+    font-size: 11px; font-weight: 600; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 10px;
+  }
+  .step-reasoning p {
+    font-style: italic; color: var(--ch-text); font-size: 15px;
+    max-width: 900px;
+  }
+  .step-sql pre {
+    background: var(--ch-panel-2); border: 1px solid var(--ch-border);
+    border-radius: 4px; padding: 18px 20px;
+    overflow-x: auto; font-family: var(--mono); font-size: 13px;
+    line-height: 1.5; color: var(--ch-text);
+    white-space: pre;
+  }
+  .step-sql .sql-comment { color: var(--ch-muted); font-style: italic; }
+  .step-sql .sql-keyword { color: var(--ch-yellow); font-weight: 600; }
+  .step-sql .sql-string  { color: #E7B4FF; }
+  .step-sql .sql-number  { color: #9DDAFF; }
+
+  .step-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    margin-top: 18px;
+  }
+  .step-precision ul { list-style: none; padding-left: 0; }
+  .step-precision li {
+    font-family: var(--mono); font-size: 13px; color: var(--ch-text);
+    padding: 5px 0; border-bottom: 1px dashed var(--ch-border);
+    display: flex; justify-content: space-between; gap: 16px;
+  }
+  .step-precision li:last-child { border-bottom: 0; }
+  .step-precision li .k { color: var(--ch-muted); flex-shrink: 0; }
+  .step-precision li .v { text-align: right; color: var(--ch-text); }
+  .step-precision li .v.highlight { color: var(--ch-yellow); font-weight: 600; }
+  .step-insight {
+    background: var(--ch-panel-2); border-radius: 4px;
+    padding: 18px 20px;
+  }
+  .step-insight p { color: var(--ch-text); font-size: 15px; }
+
+  .step-empty-note {
+    background: rgba(252, 36, 36, 0.08);
+    border: 1px solid rgba(252, 36, 36, 0.35);
+    border-radius: 4px; padding: 16px 20px;
+    color: #FFB3B3;
+  }
+  .step-empty-note strong { color: var(--ch-red); }
+
+  /* Final brief */
+  section.brief { padding: 32px 0 64px; }
+  .brief-card {
+    background: var(--ch-panel); border: 1px solid var(--ch-border);
+    border-top: 3px solid var(--ch-yellow); border-radius: 4px;
+    padding: 32px;
+  }
+  .brief-card h2 {
+    font-size: 24px; font-weight: 700; letter-spacing: -0.01em;
+    margin-bottom: 16px;
+  }
+  .brief-card ul { list-style: none; padding: 0; margin: 16px 0; }
+  .brief-card li {
+    padding: 10px 0; border-bottom: 1px dashed var(--ch-border);
+    font-size: 15px;
+  }
+  .brief-card li:last-child { border-bottom: 0; }
+  .brief-card li b { color: var(--ch-yellow); margin-right: 8px; }
+  .brief-card .recommended {
+    background: rgba(250, 255, 105, 0.08);
+    border: 1px solid rgba(250, 255, 105, 0.25);
+    border-radius: 4px; padding: 18px 20px; margin-top: 20px;
+    font-size: 15px;
+  }
+  .brief-card .recommended strong { color: var(--ch-yellow); }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--ch-border);
+    padding: 24px 32px;
+    text-align: center; color: var(--ch-muted); font-size: 12px;
+    font-family: var(--mono);
+  }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .step-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 34px; }
+  }
+
+  @media print {
+    body { background: white; color: #111; }
+    .kpi { background: #f5f5f7; border-color: #ddd; }
+    article.step { background: white; border-color: #ddd; page-break-inside: avoid; }
+    .step-sql pre { background: #f5f5f7; border-color: #ddd; color: #111; }
+    .step-insight { background: #f5f5f7; }
+    .brief-card { background: white; border-color: #ddd; }
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="inner">
+      <div class="brand">
+        <span class="block-red"></span><span class="block-yellow"></span>
+        <span>enterprise_agent_memory / on ClickHouse</span>
+      </div>
+      <div class="meta-chips">
+        <span>Support Copilot (Conversational Memory)</span>
+        <span>user: u-maruthi</span>
+        <span>2026-04-19T11:05:09+00:00</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="page">
+      <div class="eyebrow">Session trace / solution architect report</div>
+      <h1>
+        How the agent answered:
+        <span class="question">hi, I am u-maruthi. What do you remember, and remember my EXPLAIN PIPELINE preference.</span>
+      </h1>
+      <p class="subtitle">
+        Every tool invocation, the SQL ClickHouse ran, the physical rows scanned,
+        the selectivity, and the insight the agent produced. Built so any solution
+        architect can explain exactly why this is precise work, not brute force.
+      </p>
+    </div>
+  </section>
+
+  
+    <section class="scorecard">
+      <div class="page">
+        <h2>Precision Scorecard</h2>
+        <div class="kpi-grid">
+          <div class="kpi hero-kpi">
+            <div class="kpi-value">391</div>
+            <div class="kpi-label">Physical rows scanned</div>
+            <div class="kpi-note">Across 3 tool call(s)</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-value">55.8 KB</div>
+            <div class="kpi-label">Bytes read</div>
+            <div class="kpi-note">0.0071% of a brute-force full scan</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-value">877 ms</div>
+            <div class="kpi-label">End-to-end latency</div>
+            <div class="kpi-note">Sum of ClickHouse query times</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-value">2<span class="unit">tools</span></div>
+            <div class="kpi-label">Distinct retrievals</div>
+            <div class="kpi-note">0 empty-state signal(s) handled honestly</div>
+          </div>
+        </div>
+        <div class="scorecard-narrative">
+          The agent answered the question with <strong>391</strong>
+          physical rows read and <strong>55.8 KB</strong> of
+          scan I/O, in <strong>877 ms</strong> across
+          <strong>2</strong> targeted ClickHouse queries.
+          A naive brute-force approach over the same data would have read
+          ~762.9 MB and taken ~15s.
+          Every query used a filter, an index, or a partition-prune; none
+          was an unbounded scan.
+        </div>
+      </div>
+    </section>
+    
+
+  <section class="steps">
+    <div class="page">
+      <h2>Reasoning trace</h2>
+      
+    <article class="step warm">
+      <header class="step-header">
+        <span class="step-number">Step 1</span>
+        <span class="step-label">Semantic recall</span>
+        <span class="tier-chip warm"><span class="dot"></span>WARM</span>
+        <span class="step-latency">tool <b>recall_memory</b> · 7.79 ms</span>
+      </header>
+
+      <div class="step-section step-reasoning">
+        <h4>Why this tool</h4>
+        <p>Picked recall_memory because the user asked for continuity with &#x27;u-maruthi&#x27;. agent_memory_long is the WARM store of every past turn + distilled fact for this user; HNSW cosineDistance ranks by semantic similarity to the query.</p>
+      </div>
+
+      <div class="step-section step-sql">
+        <h4>ClickHouse query</h4>
+        <pre><code><span class="sql-comment">-- WARM tier: SEMANTIC RECALL across every past session for this user.</span>
+    <span class="sql-comment">-- agent_memory_long is MergeTree + HNSW <span class="sql-keyword">on</span> content_embedding, so the</span>
+    <span class="sql-comment">-- <span class="sql-keyword">ORDER BY</span> <span class="sql-keyword">cosineDistance</span> <span class="sql-keyword">LIMIT</span> k is handled by the vector index.</span>
+    <span class="sql-comment">-- <span class="sql-keyword">cosineDistance</span>: <span class="sql-number">0</span> = identical, <span class="sql-number">2</span> = opposite. Lower = more similar.</span>
+    <span class="sql-keyword">SELECT</span> memory_id, session_id, turn_id, role, content,
+           memory_type, importance, ts,
+           <span class="sql-comment">-- Rounded copy for display; the un-rounded form drives the sort.</span>
+           <span class="sql-keyword">round</span>(<span class="sql-keyword">cosineDistance</span>(content_embedding, [&lt;query embedding vector&gt;]), <span class="sql-number">4</span>) <span class="sql-keyword">AS</span> similarity_distance
+    <span class="sql-keyword">FROM</span> enterprise_memory.agent_memory_long
+    <span class="sql-comment">-- Scope to the calling user&#x27;s memory only.</span>
+    <span class="sql-keyword">WHERE</span> user_id = {user_id:String}
+    <span class="sql-comment">-- <span class="sql-keyword">ORDER BY</span> uses the un-rounded distance so HNSW kicks <span class="sql-keyword">in</span>.</span>
+    <span class="sql-keyword">ORDER BY</span> <span class="sql-keyword">cosineDistance</span>(content_embedding, [&lt;query embedding vector&gt;]) ASC
+    <span class="sql-keyword">LIMIT</span> {k:UInt32}</code></pre>
+      </div>
+
+      <div class="step-section step-grid">
+        <div class="step-precision">
+          <h4>Precision signature</h4>
+          <ul><li><span class="k">Rows read</span><span class="v highlight">195</span></li><li><span class="k">Bytes read</span><span class="v">27.8 KB</span></li><li><span class="k">Rows returned</span><span class="v">4</span></li><li><span class="k">Selectivity</span><span class="v highlight">2.05%</span></li><li><span class="k">Filter</span><span class="v">user_id = u-maruthi</span></li><li><span class="k">Filter</span><span class="v">ORDER BY cosineDistance(content_embedding, query_vec) ASC</span></li><li><span class="k">Filter</span><span class="v">LIMIT 5</span></li><li><span class="k">Index hint</span><span class="v">HNSW vector_similarity on `content_embedding`, scoped by user_id prefix</span></li><li><span class="k">Embedding dim</span><span class="v">768</span></li></ul>
+        </div>
+        <div>
+          <h4>Result</h4>
+          <div class="step-insight"><p>4 past turn(s) / fact(s) found. Top content: Yeah this is the mass key-fetch pattern we hit before. What did we do last time?.</p></div>
+        </div>
+      </div>
+    </article>
+    
+    <article class="step warm">
+      <header class="step-header">
+        <span class="step-number">Step 2</span>
+        <span class="step-label">Save to memory</span>
+        <span class="tier-chip warm"><span class="dot"></span>WARM</span>
+        <span class="step-latency">tool <b>save_memory</b> · 839 ms</span>
+      </header>
+
+      <div class="step-section step-reasoning">
+        <h4>Why this tool</h4>
+        <p>Picked save_memory because the user stated a preference. We embed the distilled sentence, tag memory_type=&#x27;semantic&#x27; with importance 0.9, and write a single MergeTree row so future sessions can recall it.</p>
+      </div>
+
+      <div class="step-section step-sql">
+        <h4>ClickHouse query</h4>
+        <pre><code><span class="sql-comment">-- WARM tier: persist a distilled fact to long-term memory.</span>
+<span class="sql-comment">-- The embed() call happens first; the vector is stored alongside</span>
+<span class="sql-comment">-- the content so future recalls can rank by <span class="sql-keyword">cosineDistance</span>.</span>
+<span class="sql-keyword">INSERT INTO</span> enterprise_memory.agent_memory_long
+    (user_id, agent_id, session_id, turn_id, role, content,
+     content_embedding, memory_type, importance)
+<span class="sql-keyword">VALUES</span>
+    ({user_id}, {agent_id}, {session_id}, <span class="sql-number">0</span>, <span class="sql-string">&#x27;assistant&#x27;</span>, {fact},
+     [&lt;embedding vector&gt;], {kind}, {importance})</code></pre>
+      </div>
+
+      <div class="step-section step-grid">
+        <div class="step-precision">
+          <h4>Precision signature</h4>
+          <ul><li><span class="k">Rows read</span><span class="v">-</span></li><li><span class="k">Bytes read</span><span class="v">-</span></li><li><span class="k">Rows returned</span><span class="v">1</span></li><li><span class="k">Selectivity</span><span class="v highlight">n/a (write or non-SELECT)</span></li><li><span class="k">Filter</span><span class="v">user_id=u-maruthi</span></li><li><span class="k">Filter</span><span class="v">memory_type=semantic</span></li><li><span class="k">Filter</span><span class="v">importance=0.9</span></li><li><span class="k">Index hint</span><span class="v">MergeTree INSERT (partitioned by toYYYYMM(ts))</span></li><li><span class="k">Embedding dim</span><span class="v">768</span></li></ul>
+        </div>
+        <div>
+          <h4>Result</h4>
+          <div class="step-insight"><p>Persisted: &quot;user prefers ClickHouse EXPLAIN PIPELINE format for query plans&quot; as semantic memory with importance 0.9. Will surface in any future recall for this user.</p></div>
+        </div>
+      </div>
+    </article>
+    
+    <article class="step warm">
+      <header class="step-header">
+        <span class="step-number">Step 3</span>
+        <span class="step-label">Semantic recall (verify)</span>
+        <span class="tier-chip warm"><span class="dot"></span>WARM</span>
+        <span class="step-latency">tool <b>recall_memory</b> · 30.4 ms</span>
+      </header>
+
+      <div class="step-section step-reasoning">
+        <h4>Why this tool</h4>
+        <p>Picked recall_memory a second time to close the loop: we just wrote a fact, we now verify it is retrievable via vector ranking. This proves the memory round-trip works, not just the write.</p>
+      </div>
+
+      <div class="step-section step-sql">
+        <h4>ClickHouse query</h4>
+        <pre><code><span class="sql-comment">-- WARM tier: SEMANTIC RECALL across every past session for this user.</span>
+    <span class="sql-comment">-- agent_memory_long is MergeTree + HNSW <span class="sql-keyword">on</span> content_embedding, so the</span>
+    <span class="sql-comment">-- <span class="sql-keyword">ORDER BY</span> <span class="sql-keyword">cosineDistance</span> <span class="sql-keyword">LIMIT</span> k is handled by the vector index.</span>
+    <span class="sql-comment">-- <span class="sql-keyword">cosineDistance</span>: <span class="sql-number">0</span> = identical, <span class="sql-number">2</span> = opposite. Lower = more similar.</span>
+    <span class="sql-keyword">SELECT</span> memory_id, session_id, turn_id, role, content,
+           memory_type, importance, ts,
+           <span class="sql-comment">-- Rounded copy for display; the un-rounded form drives the sort.</span>
+           <span class="sql-keyword">round</span>(<span class="sql-keyword">cosineDistance</span>(content_embedding, [&lt;query embedding vector&gt;]), <span class="sql-number">4</span>) <span class="sql-keyword">AS</span> similarity_distance
+    <span class="sql-keyword">FROM</span> enterprise_memory.agent_memory_long
+    <span class="sql-comment">-- Scope to the calling user&#x27;s memory only.</span>
+    <span class="sql-keyword">WHERE</span> user_id = {user_id:String}
+    <span class="sql-comment">-- <span class="sql-keyword">ORDER BY</span> uses the un-rounded distance so HNSW kicks <span class="sql-keyword">in</span>.</span>
+    <span class="sql-keyword">ORDER BY</span> <span class="sql-keyword">cosineDistance</span>(content_embedding, [&lt;query embedding vector&gt;]) ASC
+    <span class="sql-keyword">LIMIT</span> {k:UInt32}</code></pre>
+      </div>
+
+      <div class="step-section step-grid">
+        <div class="step-precision">
+          <h4>Precision signature</h4>
+          <ul><li><span class="k">Rows read</span><span class="v highlight">196</span></li><li><span class="k">Bytes read</span><span class="v">28.0 KB</span></li><li><span class="k">Rows returned</span><span class="v">1</span></li><li><span class="k">Selectivity</span><span class="v highlight">0.51%</span></li><li><span class="k">Filter</span><span class="v">user_id = u-maruthi</span></li><li><span class="k">Filter</span><span class="v">ORDER BY cosineDistance(content_embedding, query_vec) ASC</span></li><li><span class="k">Filter</span><span class="v">LIMIT 3</span></li><li><span class="k">Index hint</span><span class="v">HNSW vector_similarity on `content_embedding`, scoped by user_id prefix</span></li><li><span class="k">Embedding dim</span><span class="v">768</span></li></ul>
+        </div>
+        <div>
+          <h4>Result</h4>
+          <div class="step-insight"><p>Verified. Top match: &quot;user prefers ClickHouse EXPLAIN PIPELINE format for query plans&quot; at cosineDistance 0.2259.</p></div>
+        </div>
+      </div>
+    </article>
+    
+    </div>
+  </section>
+
+  
+    <section class="brief">
+      <div class="page">
+        <div class="brief-card">
+          <h2>Final brief</h2>
+          <ul><li><b>User:</b> u-maruthi</li><li><b>Prior memory loaded:</b> 4 past turn(s) matched</li><li><b>New fact persisted:</b> user prefers ClickHouse EXPLAIN PIPELINE format for query plans</li><li><b>Round-trip verified:</b> yes</li></ul>
+          <div class="recommended"><strong>Recommended.</strong> Call recall_memory at the start of every new turn for this user so the agent appears continuous. Use save_memory whenever the user states a preference or decision. The WARM tier survives container restarts; HOT session scratch does not.</div>
+        </div>
+      </div>
+    </section>
+    
+
+  <footer>
+    Generated by cookbooks/report/generate.py -- ClickHouse 26.3 · HNSW vector_similarity · SQL JOINs
+  </footer>
+</body>
+</html>

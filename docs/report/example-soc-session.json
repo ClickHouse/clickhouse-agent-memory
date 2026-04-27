@@ -1,0 +1,371 @@
+{
+  "agent_preset": "ai-soc-agent",
+  "agent_label": "AI SOC Agent (Cybersecurity)",
+  "user_id": "u-maruthi",
+  "question": "what is happening on user-006, full triage",
+  "started_at": "2026-04-19T11:05:07+00:00",
+  "brute_force_baseline_bytes": 3000000000,
+  "brute_force_baseline_latency_s": 60,
+  "steps": [
+    {
+      "operation_label": "Live security events",
+      "reasoning": "Picked scan_live_stream because the user asked about 'user-006' current behaviour. sec_events_stream is a Memory-engine live feed from SIEM/EDR/IAM; we filter by user_id + severity so the scan is tight.",
+      "insight_text": "1 high-severity event(s). Top: login_success on user-006. This is the activity the agent will triage.",
+      "envelope": {
+        "tier": "HOT",
+        "domain": "cybersecurity",
+        "operation": "scan_live_stream",
+        "latency_ms": 2.96,
+        "row_count": 1,
+        "insights": {
+          "filter_applied": "user-006",
+          "window_minutes": 60,
+          "top_event_type": "login_success",
+          "top_user": "user-006"
+        },
+        "precision": {
+          "filters_applied": [
+            "filter=user-006",
+            "level IN ('ERROR','CRITICAL')",
+            "ts >= now() - INTERVAL 60 MINUTE",
+            "LIMIT 20"
+          ],
+          "index_hint": "Memory engine (in-RAM, no secondary index, full table scan is cheap)",
+          "embedding_dim": null,
+          "rows_read": 8,
+          "bytes_read": 1222,
+          "rows_returned": 1,
+          "selectivity": "12.5%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "event_id": "71a79f7c-ca7c-44b5-8f60-1084947db19d",
+            "ts": "2026-04-19T10:58:28.176000",
+            "event_type": "login_success",
+            "source_system": "SIEM",
+            "user_id": "user-006",
+            "asset_id": "asset-001",
+            "src_ip": "185.220.101.47",
+            "dst_ip": "10.0.0.2",
+            "action": "login",
+            "outcome": "success",
+            "severity": "critical"
+          }
+        ],
+        "sql": "-- HOT tier: live security event stream (Memory engine).\n-- sec_events_stream ingests from SIEM / EDR / IAM in real time.\nSELECT event_id, ts, event_type, source_system, user_id,\n       asset_id, src_ip, dst_ip, action, outcome, severity\nFROM enterprise_memory.sec_events_stream\n-- Filter is one of user_id / asset_id / src_ip, or empty = all.\nWHERE (length({service:String}) = 0\n       OR user_id = {service:String}\n       OR asset_id = {service:String}\n       OR src_ip = {service:String})\n  -- Triage bar: only high + critical severity.\n  AND severity IN ('high', 'critical')\n  -- Lookback window in minutes.\n  AND ts >= now() - INTERVAL {minutes:UInt32} MINUTE\nORDER BY ts DESC\nLIMIT {limit:UInt32}"
+      }
+    },
+    {
+      "operation_label": "Case workspace",
+      "reasoning": "Picked open_investigation because SOC triage needs a case_id that stays consistent across threat intel + historical + graph steps. sec_case_workspace gives us that scope.",
+      "insight_text": "Case CASE-1776596706 materialised: 5 correlated event(s).",
+      "envelope": {
+        "tier": "HOT",
+        "domain": "cybersecurity",
+        "operation": "open_investigation",
+        "latency_ms": 3.92,
+        "row_count": 5,
+        "insights": {
+          "case_id": "CASE-1776596706",
+          "workspace_table": "sec_case_workspace",
+          "groups_summarised": 5,
+          "events_loaded": 5
+        },
+        "precision": {
+          "filters_applied": [
+            "case_id=CASE-1776596706",
+            "group by service / element / event_type"
+          ],
+          "index_hint": "Memory engine (INSERT ... SELECT + GROUP BY, single-pass)",
+          "embedding_dim": null,
+          "rows_read": 5,
+          "bytes_read": 545,
+          "rows_returned": 5,
+          "selectivity": "100.0%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "event_type": "login_success",
+            "severity": "critical",
+            "events": 1,
+            "unique_users": 1,
+            "unique_assets": 1,
+            "src_ips": [
+              "185.220.101.47"
+            ]
+          },
+          {
+            "event_type": "data_exfil",
+            "severity": "critical",
+            "events": 1,
+            "unique_users": 1,
+            "unique_assets": 1,
+            "src_ips": [
+              "10.0.5.42"
+            ]
+          },
+          {
+            "event_type": "privilege_esc",
+            "severity": "high",
+            "events": 1,
+            "unique_users": 1,
+            "unique_assets": 1,
+            "src_ips": [
+              "10.0.2.30"
+            ]
+          }
+        ],
+        "sql": "-- HOT tier: open a SOC case workspace for this case_id.\n        -- We sweep recent high-severity security events into the case\n        -- table so the agent can scope to this case going forward.\n        INSERT INTO enterprise_memory.sec_case_workspace\n        SELECT\n            {case_id:String} AS case_id,\n            event_id, ts, event_type, user_id, asset_id,\n            src_ip, action, outcome, toString(severity) AS severity,\n            now64() AS added_at\n        FROM enterprise_memory.sec_events_stream\n        WHERE severity IN ('high', 'critical')\n          -- Wider window than the live scan (30m vs 15m) so we do not lose\n          -- the attacker's lead-up events.\n          AND ts >= now() - INTERVAL 30 MINUTE\n\n\n-- Group by the natural key so we see the fault shape:\n\n        -- Group the case workspace by event_type + severity so the agent\n        -- can spot patterns (\"10 login_failed on one asset\") and scope.\n        SELECT event_type, severity,\n               count() AS events,\n               uniqExact(user_id) AS unique_users,\n               uniqExact(asset_id) AS unique_assets,\n               groupArray(DISTINCT src_ip) AS src_ips\n        FROM enterprise_memory.sec_case_workspace\n        WHERE case_id = {case_id:String}\n        GROUP BY event_type, severity\n        ORDER BY events DESC"
+      }
+    },
+    {
+      "operation_label": "Threat intel lookup",
+      "reasoning": "Picked fetch_record(kind='threat_intel') because before we chase history we want to know if the IoC or attack shape is already a known threat actor. Vector search over sec_threat_intel ranks by similarity to the current situation.",
+      "insight_text": "Top threat intel match: FIN6 / Operation FinFisher, confidence 0.949999988079071. Attribution is load-bearing.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "cybersecurity",
+        "operation": "threat_intel_lookup",
+        "latency_ms": 20.78,
+        "row_count": 3,
+        "insights": {
+          "kind": "threat_intel",
+          "identifier": null,
+          "query": "suspicious login from tor exit node FIN6 credential stuffing",
+          "matches": 3
+        },
+        "precision": {
+          "filters_applied": [
+            "ORDER BY cosineDistance(embedding, query_vec) ASC",
+            "LIMIT 3"
+          ],
+          "index_hint": "HNSW vector_similarity on `embedding` (threat intel)",
+          "embedding_dim": 768,
+          "rows_read": 8,
+          "bytes_read": 16066,
+          "rows_returned": 3,
+          "selectivity": "37.5%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "indicator_id": "c0a71fdf-2c85-4322-b6ea-1c1cfbc55a1f",
+            "indicator_type": "ip",
+            "indicator_val": "185.220.101.47",
+            "threat_actor": "FIN6",
+            "campaign": "Operation FinFisher",
+            "ttps": [
+              "T1566.001",
+              "T1059.001",
+              "T1078"
+            ],
+            "confidence": 0.949999988079071,
+            "description": "Known FIN6 C2 server used in financial sector attacks via phishing and credential theft",
+            "first_seen": "2025-04-19T11:03:25.852000",
+            "last_seen": "2026-04-19T11:03:26.359000",
+            "similarity_distance": 0.2918
+          },
+          {
+            "indicator_id": "f57cd478-2bb3-4e68-bbac-bcc5a7a24785",
+            "indicator_type": "domain",
+            "indicator_val": "update-service.net",
+            "threat_actor": "Lazarus",
+            "campaign": "Operation DreamJob",
+            "ttps": [
+              "T1566.002",
+              "T1204.001",
+              "T1105"
+            ],
+            "confidence": 0.8199999928474426,
+            "description": "Lazarus Group phishing domain masquerading as software update service",
+            "first_seen": "2025-08-17T11:03:25.852000",
+            "last_seen": "2026-04-19T11:03:27.246000",
+            "similarity_distance": 0.4235
+          },
+          {
+            "indicator_id": "06590a69-e3e4-49db-9aab-8125c465208b",
+            "indicator_type": "ip",
+            "indicator_val": "91.108.4.0",
+            "threat_actor": "Sandworm",
+            "campaign": "NotPetya",
+            "ttps": [
+              "T1561.002",
+              "T1485",
+              "T1486"
+            ],
+            "confidence": 0.9100000262260437,
+            "description": "Sandworm destructive malware C2 infrastructure targeting critical infrastructure",
+            "first_seen": "2025-12-15T11:03:25.852000",
+            "last_seen": "2026-04-19T11:03:28.031000",
+            "similarity_distance": 0.4394
+          }
+        ],
+        "sql": "-- WARM tier: THREAT INTEL SEMANTIC LOOKUP.\n-- Vector search over sec_threat_intel where the embedded text is\n-- (actor + campaign + description). Used to check whether the\n-- current IoC / TTP / description matches any known threat group.\nSELECT indicator_id, toString(indicator_type) AS indicator_type,\n       indicator_val, threat_actor, campaign, ttps,\n       confidence, description, first_seen, last_seen,\n       round(cosineDistance(embedding, [<query embedding vector>]), 4) AS similarity_distance\nFROM enterprise_memory.sec_threat_intel\nORDER BY cosineDistance(embedding, [<query embedding vector>]) ASC\nLIMIT {k:UInt32}"
+      }
+    },
+    {
+      "operation_label": "Semantic search",
+      "reasoning": "Picked semantic_search because we want 'has this attack shape happened here before'. sec_historical_incidents is the persistent record; HNSW + cosineDistance ranks by symptom similarity.",
+      "insight_text": "Top past incident: \"Admin account compromised via credential stuffing\" at cosineDistance 0.1477. Root cause: Password reuse from compromised third-party service; no MFA on DB admin account.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "cybersecurity",
+        "operation": "semantic_search",
+        "latency_ms": 8.72,
+        "row_count": 3,
+        "insights": {
+          "query_text": "admin account compromised credential stuffing database access",
+          "k": 3,
+          "top_match": "Admin account compromised via credential stuffing",
+          "similarity_distance": 0.1477,
+          "top_root_cause": "Password reuse from compromised third-party service; no MFA on DB admin account"
+        },
+        "precision": {
+          "filters_applied": [
+            "ORDER BY cosineDistance(embedding, query_vec) ASC",
+            "LIMIT 3"
+          ],
+          "index_hint": "HNSW vector_similarity('hnsw', 'cosineDistance', 768) on `embedding` column",
+          "embedding_dim": 768,
+          "rows_read": 8,
+          "bytes_read": 16811,
+          "rows_returned": 3,
+          "selectivity": "37.5%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "incident_id": "3fcd8d41-ab4e-4f81-82af-df13f2242483",
+            "ts": "2025-03-15T21:03:28.040000",
+            "incident_type": "credential_compromise",
+            "title": "Admin account compromised via credential stuffing",
+            "description": "Database admin account compromised using credentials from third-party breach, attacker accessed PII database",
+            "threat_actor": "FIN6",
+            "ttps": [
+              "T1078",
+              "T1530"
+            ],
+            "root_cause": "Password reuse from compromised third-party service; no MFA on DB admin account",
+            "response": "Suspended account, rotated all DB credentials, enabled MFA, reviewed access logs",
+            "outcome": "Contained; 50k PII records potentially exposed; notified DPA",
+            "severity": "critical",
+            "similarity_distance": 0.1477
+          },
+          {
+            "incident_id": "578f33da-c855-4c47-9f05-dd39a2fcd452",
+            "ts": "2025-05-29T14:03:28.040000",
+            "incident_type": "ransomware",
+            "title": "Ransomware deployment via compromised VPN credentials",
+            "description": "Attacker used stolen VPN credentials to access corporate network and deploy ransomware on file servers",
+            "threat_actor": "REvil",
+            "ttps": [
+              "T1078",
+              "T1486",
+              "T1490"
+            ],
+            "root_cause": "VPN credentials phished via spear-phishing email; no MFA on VPN",
+            "response": "Isolated affected systems, restored from backup, implemented MFA on VPN",
+            "outcome": "Contained; 2TB backup data encrypted; restored within 8 hours from clean backup",
+            "severity": "critical",
+            "similarity_distance": 0.3893
+          },
+          {
+            "incident_id": "b4ae3141-73ef-49a4-888f-c40671b8ae56",
+            "ts": "2025-08-12T13:03:28.040000",
+            "incident_type": "insider_threat",
+            "title": "Finance analyst exfiltrating data to personal cloud storage",
+            "description": "Finance analyst uploading sensitive financial reports to personal Dropbox account",
+            "threat_actor": "Insider",
+            "ttps": [
+              "T1567.002",
+              "T1052"
+            ],
+            "root_cause": "No DLP controls on cloud storage uploads; excessive data access permissions",
+            "response": "Suspended user account, blocked cloud storage uploads, reviewed all access",
+            "outcome": "Contained; disciplinary action taken; DLP solution implemented",
+            "severity": "high",
+            "similarity_distance": 0.3949
+          }
+        ],
+        "sql": "-- WARM tier: SEMANTIC SEARCH over past security incidents.\n-- Same pattern: rank historical incidents by vector similarity\n-- to the current event description.\nSELECT incident_id, ts, incident_type, title, description,\n       threat_actor, ttps, root_cause, response, outcome,\n       toString(severity) AS severity,\n       round(cosineDistance(embedding, [<query embedding vector>]), 4) AS similarity_distance\nFROM enterprise_memory.sec_historical_incidents\nORDER BY cosineDistance(embedding, [<query embedding vector>]) ASC\nLIMIT {k:UInt32}"
+      }
+    },
+    {
+      "operation_label": "User-asset graph",
+      "reasoning": "Picked graph_traverse because we need the lateral-movement picture before we can recommend containment. sec_access JOIN sec_assets lists assets this user can reach; hop-2 surfaces other users who share those assets (pivot candidates).",
+      "insight_text": "2 asset(s) directly reachable by user-006, 2 of them critical. 3 other user(s) share access to those assets (lateral pivot risk).",
+      "envelope": {
+        "tier": "GRAPH",
+        "domain": "cybersecurity",
+        "operation": "graph_traverse",
+        "latency_ms": 8.18,
+        "row_count": 5,
+        "insights": {
+          "start_entity": "user-006",
+          "direct_neighbours": 2,
+          "indirect_neighbours": 3,
+          "critical_assets_reachable": 2
+        },
+        "precision": {
+          "filters_applied": [
+            "start entity: user-006",
+            "max_hops=2",
+            "JOIN on service_id / element_id / asset_id (indexed PKs)"
+          ],
+          "index_hint": "MergeTree PK JOINs + UNION ALL over 1-hop and 2-hop branches",
+          "embedding_dim": null,
+          "rows_read": 52,
+          "bytes_read": 1437,
+          "rows_returned": 5,
+          "selectivity": "9.62%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "related": "asset-001",
+            "hostname": "prod-db-pii-01",
+            "asset_type": "database",
+            "criticality": "critical",
+            "data_class": "PII",
+            "network_zone": "prod-internal",
+            "edge_type": "admin",
+            "hops": 1
+          },
+          {
+            "related": "asset-002",
+            "hostname": "prod-db-finance-01",
+            "asset_type": "database",
+            "criticality": "critical",
+            "data_class": "Financial",
+            "network_zone": "prod-internal",
+            "edge_type": "admin",
+            "hops": 1
+          },
+          {
+            "related": "user-001",
+            "hostname": "alice.chen",
+            "asset_type": "user",
+            "criticality": "medium",
+            "data_class": "",
+            "network_zone": "",
+            "edge_type": "lateral_access",
+            "hops": 2
+          }
+        ],
+        "sql": "-- GRAPH tier: multi-hop access traversal for cybersecurity.\n-- Question: \"what assets can <user> reach, and what lateral\n-- movement is possible from those assets?\"\n--\n-- Hop 1: assets the user has direct access to (edge = access_type).\nSELECT a.asset_id AS related, a.hostname, a.asset_type,\n       a.criticality, a.data_class, a.network_zone,\n       ac.access_type AS edge_type, 1 AS hops\nFROM enterprise_memory.sec_access ac\nJOIN enterprise_memory.sec_assets a ON a.asset_id = ac.asset_id\nWHERE ac.user_id = {entity:String}\n\nUNION ALL\n\n-- Hop 2: OTHER users who share access to any of the same assets\n-- as the target user. These are lateral-movement candidates.\nSELECT u2.user_id, u2.username, 'user' AS asset_type,\n       'medium' AS criticality, '' AS data_class, '' AS network_zone,\n       'lateral_access' AS edge_type, 2 AS hops\nFROM enterprise_memory.sec_access ac2\nJOIN enterprise_memory.sec_users u2 ON u2.user_id = ac2.user_id\nWHERE ac2.asset_id IN (\n    SELECT asset_id FROM enterprise_memory.sec_access\n    WHERE user_id = {entity:String}\n)\nAND u2.user_id != {entity:String}\nAND {max_hops:UInt32} >= 2"
+      }
+    }
+  ],
+  "final_brief": {
+    "fields": {
+      "Attacker context": "FIN6 / Operation FinFisher",
+      "Triggering event": "login_success on user-006",
+      "Lateral movement risk": "2 direct assets / 2 critical / 3 other users share access",
+      "Top past incident": "Admin account compromised via credential stuffing (cosineDistance 0.1477)",
+      "Case id": "CASE-1776596706"
+    },
+    "recommended": "Contain: suspend the user session and rotate credentials. Respond: isolate the critical assets in Step 5 from the user until the investigation closes. Follow the resolution from the top past incident. Add the IP/IoC from the threat-intel step to the block list."
+  }
+}

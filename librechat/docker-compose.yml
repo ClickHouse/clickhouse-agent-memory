@@ -1,0 +1,104 @@
+# ============================================================================
+# LibreChat + Memory MCP server
+#
+# This compose file brings up LibreChat (plus MongoDB and Meilisearch) and
+# the memory MCP server. Expects the cookbook stack (ClickHouse + demo-app)
+# to be running on the shared external network "enterprise_memory_net".
+#
+# Usage:
+#   cd project_final/cookbooks && make start && make seed   # brings up ClickHouse + seeds
+#   cd project_final/librechat && make start                # brings up LibreChat + MCP
+#   open http://localhost:13800                             # or $LIBRECHAT_PORT
+#
+# Published ports (all overridable via env):
+#   LibreChat  13800  (override with LIBRECHAT_PORT)
+#   memory-mcp 18765  (override with MCP_PORT)
+# ============================================================================
+
+services:
+  memory-mcp:
+    build:
+      context: ../cookbooks
+      dockerfile: Dockerfile
+    container_name: memory-mcp
+    working_dir: /app
+    command: >
+      python -m mcp_server.server
+    env_file: .env
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DB: enterprise_memory
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8765"
+    volumes:
+      - ../cookbooks:/app
+    ports:
+      - "${MCP_PORT:-18765}:8765"
+    networks:
+      - enterprise_memory_net
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    container_name: librechat-mongo
+    command: mongod --noauth
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - enterprise_memory_net
+    restart: unless-stopped
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12.3
+    container_name: librechat-meili
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-local-dev-key}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meili_data:/meili_data
+    networks:
+      - enterprise_memory_net
+    restart: unless-stopped
+
+  librechat:
+    image: ghcr.io/danny-avila/librechat:latest
+    container_name: librechat
+    depends_on:
+      - mongodb
+      - meilisearch
+      - memory-mcp
+    ports:
+      - "${LIBRECHAT_PORT:-13800}:3080"
+    env_file: .env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "3080"
+      MONGO_URI: "mongodb://mongodb:27017/LibreChat"
+      MEILI_HOST: "http://meilisearch:7700"
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-local-dev-key}
+      CONFIG_PATH: /app/librechat.yaml
+      ALLOW_EMAIL_LOGIN: "true"
+      ALLOW_REGISTRATION: "true"
+      ALLOW_SOCIAL_LOGIN: "false"
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./librechat.yaml:/app/librechat.yaml:ro
+      - ./images:/app/client/public/images
+      - ./logs:/app/api/logs
+      - ./uploads:/app/uploads
+    networks:
+      - enterprise_memory_net
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  meili_data:
+
+networks:
+  enterprise_memory_net:
+    external: true

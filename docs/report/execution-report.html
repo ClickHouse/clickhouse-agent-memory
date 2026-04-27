@@ -1,0 +1,1621 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Enterprise Agent Memory — Execution Report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    background: #0F0F10;
+    color: #E8E8E8;
+    margin: 0;
+    padding: 48px 24px 96px;
+    line-height: 1.5;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 2.2em; font-weight: 900; margin: 0 0 8px; color: #FAFF00; letter-spacing: -0.01em; }
+  .subtitle { color: #9A9A9A; font-size: 1.05em; margin: 0 0 16px; }
+  .meta {
+    background: #1A1A1A;
+    border: 1px solid #2A2A2A;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 24px 0 48px;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 13px;
+    color: #B8B8B8;
+  }
+  .meta strong { color: #FAFF00; font-weight: 700; }
+  .scenario {
+    border-top: 2px solid #2A2A2A;
+    padding-top: 40px;
+    margin-top: 40px;
+  }
+  .scenario:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .scenario-title {
+    font-size: 1.7em;
+    font-weight: 900;
+    margin: 0 0 12px;
+    color: #FFF;
+  }
+  .user-question, .anticipated {
+    margin: 4px 0;
+    color: #C8C8C8;
+  }
+  .scenario-totals {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 16px 0 32px;
+    padding: 12px 16px;
+    background: #1a1a1a;
+    border: 1px solid #2A2A2A;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .scenario-totals strong { color: #FAFF00; }
+  .step {
+    background: #141414;
+    border: 1px solid #252525;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 0 0 20px;
+  }
+  .step-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .step-head h3 {
+    margin: 0;
+    font-size: 1.15em;
+    font-weight: 700;
+    color: #FFF;
+  }
+  .tier {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .tier-hot   { background: #FAFF00; color: #1A1A1A; }
+  .tier-warm  { background: #F2B366; color: #1A1A1A; }
+  .tier-graph { background: #6BE07A; color: #1A1A1A; }
+  .dialect {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #8A8A8A;
+  }
+  .desc { color: #B8B8B8; margin: 4px 0 16px; font-size: 0.95em; }
+  .metrics table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  .metrics th, .metrics td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #252525;
+  }
+  .metrics thead tr:first-child th {
+    color: #FAFF00;
+    font-weight: 700;
+    text-align: center;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2A2A2A;
+  }
+  .metrics thead tr:nth-child(2) th {
+    color: #9A9A9A;
+    font-weight: 400;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .metrics tbody td { color: #E8E8E8; font-weight: 700; }
+  .note {
+    color: #8A8A8A;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    margin: 4px 0 0;
+  }
+  details { margin-top: 10px; }
+  details > summary {
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #9A9A9A;
+    padding: 6px 0;
+    user-select: none;
+  }
+  details > summary:hover { color: #FAFF00; }
+  .code {
+    background: #0A0A0A;
+    border: 1px solid #1E1E1E;
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 12px;
+    color: #D8D8D8;
+    line-height: 1.55;
+    margin: 6px 0 0;
+    white-space: pre;
+  }
+
+  .sub-head { color: #FAFF00; font-size: 1.0em; margin: 24px 0 8px; font-weight: 700; letter-spacing: 0.04em; }
+  .variety { padding-left: 20px; color: #C8C8C8; }
+  .variety li { margin: 8px 0; line-height: 1.55; }
+  .variety strong { color: #FFF; }
+  .table-wrap { overflow-x: auto; border: 1px solid #252525; border-radius: 6px; }
+  table.inventory { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  table.inventory th, table.inventory td { padding: 8px 10px; border-bottom: 1px solid #1E1E1E; text-align: left; }
+  table.inventory thead th { background: #1a1a1a; color: #9A9A9A; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
+  table.inventory tbody tr:last-child td { border-bottom: none; }
+  table.inventory code { color: #FAFF00; }
+  td.purpose { color: #B8B8B8; font-family: -apple-system, 'Inter', sans-serif; font-size: 12px; }
+  .tier-util { background: #333; color: #999; }
+  .ddls details { background: #141414; border: 1px solid #252525; border-radius: 6px; padding: 10px 16px; margin: 6px 0; }
+  .ddls summary { padding: 4px 0; }
+  .ddls summary code { color: #FAFF00; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Enterprise Agent Memory — Execution Report</h1>
+    <p class="subtitle">Every query, every scenario, every row. Generated against the live cluster.</p>
+    <div class="meta"><strong>Generated at:</strong> 2026-04-23T07:29:27+00:00<br><strong>ClickHouse version:</strong> 26.3.9.8<br><strong>ClickHouse endpoint:</strong> http://localhost:18123<br><strong>Database:</strong> enterprise_memory<br><strong>Iterations per query (client):</strong> 10<br><strong>Query vector source:</strong> real 768-d embedding from obs_historical_incidents (768 dims)<br><strong>Graph tier backend:</strong> ClickHouse SQL self-JOIN + UNION ALL on MergeTree edge tables</div>
+    
+    <article class="scenario data-section">
+      <h2 class="scenario-title">Data under test</h2>
+      <p class="user-question">Every query in this report runs against the tables listed below. All data is synthetic, generated by <code>make seed</code>, and shaped to match the three-domain story (observability, cybersecurity, telco) with conversation memory on top.</p>
+
+      <div class="scenario-totals">
+        <span><strong>Tables:</strong> 21</span>
+        <span><strong>Total rows:</strong> 372</span>
+        <span><strong>Domains:</strong> observability, cybersecurity, telco, conversation</span>
+        <span><strong>Embeddings:</strong> Gemini <code>gemini-embedding-001</code>, 768-dim <code>Array(Float32)</code></span>
+      </div>
+
+      <h3 class="sub-head">Table inventory</h3>
+      <div class="table-wrap">
+        <table class="inventory">
+          <thead>
+            <tr>
+              <th>Tier</th><th>Table</th><th>Engine</th><th style="text-align:right;">Rows</th><th style="text-align:right;">Cols</th><th>What it holds</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>obs_events_stream</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">200</td>
+            <td style="text-align:right;">12</td>
+            <td class="purpose">Observability live event stream (errors, latency, traces).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-util">UTIL</span></td>
+            <td><code>benchmark_writes</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">55</td>
+            <td style="text-align:right;">11</td>
+            <td class="purpose">Dedicated sink for save_memory benchmark runs.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-graph">GRAPH</span></td>
+            <td><code>sec_access</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">12</td>
+            <td style="text-align:right;">4</td>
+            <td class="purpose">User-to-asset access edges.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-graph">GRAPH</span></td>
+            <td><code>telco_elements</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">12</td>
+            <td style="text-align:right;">8</td>
+            <td class="purpose">Telco network elements (vertex).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>telco_network_state</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">12</td>
+            <td style="text-align:right;">10</td>
+            <td class="purpose">Telco network element state (CPU, traffic, error rate).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-graph">GRAPH</span></td>
+            <td><code>obs_dependencies</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">11</td>
+            <td style="text-align:right;">4</td>
+            <td class="purpose">Service-to-service dependency edges.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-graph">GRAPH</span></td>
+            <td><code>telco_connections</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">11</td>
+            <td style="text-align:right;">5</td>
+            <td class="purpose">Telco physical/logical links (edge).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-graph">GRAPH</span></td>
+            <td><code>obs_services</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">10</td>
+            <td style="text-align:right;">6</td>
+            <td class="purpose">Observability service catalog (vertex).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-warm">WARM</span></td>
+            <td><code>obs_historical_incidents</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">8</td>
+            <td style="text-align:right;">10</td>
+            <td class="purpose">Past observability incidents with 768-d embedding for semantic search.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-graph">GRAPH</span></td>
+            <td><code>sec_assets</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">8</td>
+            <td style="text-align:right;">8</td>
+            <td class="purpose">Security asset vertices.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>sec_events_stream</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">8</td>
+            <td style="text-align:right;">12</td>
+            <td class="purpose">Security event stream (SIEM / EDR / IAM).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-graph">GRAPH</span></td>
+            <td><code>sec_users</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">8</td>
+            <td style="text-align:right;">6</td>
+            <td class="purpose">Security user vertices.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-warm">WARM</span></td>
+            <td><code>telco_network_events</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">7</td>
+            <td style="text-align:right;">10</td>
+            <td class="purpose">Past telco network events with 768-d embedding.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-warm">WARM</span></td>
+            <td><code>sec_historical_incidents</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">5</td>
+            <td style="text-align:right;">15</td>
+            <td class="purpose">Past security incidents with 768-d embedding.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-warm">WARM</span></td>
+            <td><code>sec_threat_intel</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">5</td>
+            <td style="text-align:right;">11</td>
+            <td class="purpose">Threat intel indicators with 768-d embedding.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>agent_memory_hot</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">0</td>
+            <td style="text-align:right;">7</td>
+            <td class="purpose">Cross-agent working memory (conversation scratchpad).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-warm">WARM</span></td>
+            <td><code>agent_memory_long</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">0</td>
+            <td style="text-align:right;">11</td>
+            <td class="purpose">Long-term agent memory (conversations, facts). HNSW on embedding.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-warm">WARM</span></td>
+            <td><code>knowledge_base</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">0</td>
+            <td style="text-align:right;">9</td>
+            <td class="purpose">Generic knowledge base for RAG (768-d embedding).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>obs_incident_workspace</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">0</td>
+            <td style="text-align:right;">11</td>
+            <td class="purpose">Per-investigation scratchpad (created by open_investigation).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>sec_case_workspace</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">0</td>
+            <td style="text-align:right;">11</td>
+            <td class="purpose">Per-security-case scratchpad.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>telco_fault_workspace</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">0</td>
+            <td style="text-align:right;">8</td>
+            <td class="purpose">Per-fault-ticket scratchpad.</td>
+          </tr>
+        
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub-head">Variety</h3>
+      <ul class="variety">
+        <li><strong>Time series (HOT).</strong> <code>ENGINE = Memory</code> for sub-5ms tail reads on live event streams. Volatile — cleared on container restart, which is the desired behavior for a live stream.</li>
+        <li><strong>Append-only history with vectors (WARM).</strong> <code>ENGINE = MergeTree</code> with <code>INDEX ... TYPE vector_similarity('hnsw', 'cosineDistance', 768)</code> inside the table. Every historical-incident row carries a 768-dim Gemini embedding of its title + description + root cause, so semantic search is filter-first + HNSW-ranked in one SQL statement.</li>
+        <li><strong>Small relational (GRAPH).</strong> Service catalogs and dependency edges as plain MergeTree tables. 2-hop blast radius is a self-JOIN + UNION ALL, one branch per hop depth. Same SQL engine as HOT and WARM, no separate graph store.</li>
+        <li><strong>Conversation memory.</strong> <code>agent_memory_hot</code> (Memory engine, last N turns) and <code>agent_memory_long</code> (MergeTree + HNSW, 768-d) persist cross-agent context. Every save_memory call is an INSERT against these.</li>
+      </ul>
+
+      <h3 class="sub-head">Data model</h3>
+      <pre class="code">HOT   ──▶  Memory-engine tables     → scan fast, write fast, volatile
+WARM  ──▶  MergeTree + HNSW idx     → filter by tenant/ts, then rank by cosine
+GRAPH ──▶  MergeTree vertex + edge  → SELF JOIN + UNION ALL for blast radius
+MCP 8 tools hit exactly these tables. No view layer, no ORM. The SQL you see in
+each scenario is the SQL the server runs.</pre>
+
+      <h3 class="sub-head">DDL — click to expand</h3>
+      <div class="ddls">
+        
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>obs_events_stream</code> — 200 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.obs_events_stream
+(
+    `event_id` UUID DEFAULT generateUUIDv4(),
+    `ts` DateTime64(3) DEFAULT now64(),
+    `service` String,
+    `host` String,
+    `level` Enum8(&#x27;DEBUG&#x27; = 1, &#x27;INFO&#x27; = 2, &#x27;WARN&#x27; = 3, &#x27;ERROR&#x27; = 4, &#x27;CRITICAL&#x27; = 5),
+    `message` String,
+    `trace_id` String,
+    `span_id` String,
+    `latency_ms` Float32,
+    `error_code` Nullable(String),
+    `region` String,
+    `env` String
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-util">UTIL</span> <code>benchmark_writes</code> — 55 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.benchmark_writes
+(
+    `memory_id` UUID DEFAULT generateUUIDv4(),
+    `user_id` String,
+    `agent_id` LowCardinality(String) DEFAULT &#x27;&#x27;,
+    `session_id` String,
+    `turn_id` UInt32 DEFAULT 0,
+    `role` LowCardinality(String) DEFAULT &#x27;assistant&#x27;,
+    `content` String,
+    `content_embedding` Array(Float32),
+    `memory_type` LowCardinality(String) DEFAULT &#x27;episodic&#x27;,
+    `importance` Float32 DEFAULT 0.5,
+    `ts` DateTime64(3) DEFAULT now64(),
+    INDEX embedding_idx content_embedding TYPE vector_similarity(&#x27;hnsw&#x27;, &#x27;cosineDistance&#x27;, 768) GRANULARITY 1000
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (user_id, ts, session_id)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-graph">GRAPH</span> <code>sec_access</code> — 12 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.sec_access
+(
+    `user_id` String,
+    `asset_id` String,
+    `access_type` String,
+    `granted_date` Date
+)
+ENGINE = MergeTree
+ORDER BY (user_id, asset_id)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-graph">GRAPH</span> <code>telco_elements</code> — 12 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.telco_elements
+(
+    `element_id` String,
+    `element_type` String,
+    `vendor` String,
+    `model` String,
+    `region` String,
+    `site` String,
+    `install_date` Date,
+    `criticality` String
+)
+ENGINE = MergeTree
+ORDER BY element_id
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>telco_network_state</code> — 12 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.telco_network_state
+(
+    `element_id` String,
+    `element_type` Enum8(&#x27;router&#x27; = 1, &#x27;switch&#x27; = 2, &#x27;base_station&#x27; = 3, &#x27;fiber_link&#x27; = 4, &#x27;core&#x27; = 5),
+    `vendor` String,
+    `region` String,
+    `status` Enum8(&#x27;up&#x27; = 1, &#x27;degraded&#x27; = 2, &#x27;down&#x27; = 3, &#x27;maintenance&#x27; = 4),
+    `cpu_pct` Float32,
+    `mem_pct` Float32,
+    `traffic_gbps` Float32,
+    `error_rate` Float32,
+    `last_seen` DateTime64(3) DEFAULT now64()
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-graph">GRAPH</span> <code>obs_dependencies</code> — 11 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.obs_dependencies
+(
+    `from_service` String,
+    `to_service` String,
+    `dep_type` String,
+    `latency_p99` Float32,
+    INDEX idx_to_service to_service TYPE bloom_filter(0.01) GRANULARITY 1
+)
+ENGINE = MergeTree
+ORDER BY (from_service, to_service)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-graph">GRAPH</span> <code>telco_connections</code> — 11 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.telco_connections
+(
+    `from_element` String,
+    `to_element` String,
+    `link_type` String,
+    `capacity_gbps` Float32,
+    `latency_ms` Float32
+)
+ENGINE = MergeTree
+ORDER BY (from_element, to_element)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-graph">GRAPH</span> <code>obs_services</code> — 10 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.obs_services
+(
+    `service_id` String,
+    `name` String,
+    `team` String,
+    `language` String,
+    `criticality` Enum8(&#x27;low&#x27; = 1, &#x27;medium&#x27; = 2, &#x27;high&#x27; = 3, &#x27;critical&#x27; = 4),
+    `region` String
+)
+ENGINE = MergeTree
+ORDER BY service_id
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-warm">WARM</span> <code>obs_historical_incidents</code> — 8 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.obs_historical_incidents
+(
+    `incident_id` UUID DEFAULT generateUUIDv4(),
+    `ts` DateTime64(3),
+    `title` String,
+    `description` String,
+    `affected_services` Array(String),
+    `root_cause` String,
+    `resolution` String,
+    `severity` Enum8(&#x27;P1&#x27; = 1, &#x27;P2&#x27; = 2, &#x27;P3&#x27; = 3, &#x27;P4&#x27; = 4),
+    `duration_min` UInt32,
+    `embedding` Array(Float32),
+    INDEX idx_incident_id incident_id TYPE bloom_filter(0.01) GRANULARITY 1
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (severity, ts)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-graph">GRAPH</span> <code>sec_assets</code> — 8 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.sec_assets
+(
+    `asset_id` String,
+    `hostname` String,
+    `asset_type` String,
+    `criticality` String,
+    `owner_team` String,
+    `data_class` String,
+    `network_zone` String,
+    `os` String
+)
+ENGINE = MergeTree
+ORDER BY asset_id
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>sec_events_stream</code> — 8 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.sec_events_stream
+(
+    `event_id` UUID DEFAULT generateUUIDv4(),
+    `ts` DateTime64(3) DEFAULT now64(),
+    `event_type` String,
+    `source_system` String,
+    `user_id` String,
+    `asset_id` String,
+    `src_ip` String,
+    `dst_ip` Nullable(String),
+    `action` String,
+    `outcome` String,
+    `severity` Enum8(&#x27;low&#x27; = 1, &#x27;medium&#x27; = 2, &#x27;high&#x27; = 3, &#x27;critical&#x27; = 4),
+    `raw_log` String
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-graph">GRAPH</span> <code>sec_users</code> — 8 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.sec_users
+(
+    `user_id` String,
+    `username` String,
+    `department` String,
+    `role` String,
+    `risk_score` Float32,
+    `mfa_enabled` UInt8
+)
+ENGINE = MergeTree
+ORDER BY user_id
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-warm">WARM</span> <code>telco_network_events</code> — 7 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.telco_network_events
+(
+    `event_id` UUID DEFAULT generateUUIDv4(),
+    `ts` DateTime64(3),
+    `element_id` String,
+    `event_type` String,
+    `description` String,
+    `root_cause` String,
+    `resolution` String,
+    `impact_score` Float32,
+    `customers_aff` UInt32,
+    `embedding` Array(Float32)
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (element_id, ts)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-warm">WARM</span> <code>sec_historical_incidents</code> — 5 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.sec_historical_incidents
+(
+    `incident_id` UUID DEFAULT generateUUIDv4(),
+    `ts` DateTime64(3),
+    `incident_type` String,
+    `title` String,
+    `description` String,
+    `affected_user` String,
+    `affected_asset` String,
+    `attacker_ip` String,
+    `threat_actor` String,
+    `ttps` Array(String),
+    `root_cause` String,
+    `response` String,
+    `outcome` String,
+    `severity` Enum8(&#x27;low&#x27; = 1, &#x27;medium&#x27; = 2, &#x27;high&#x27; = 3, &#x27;critical&#x27; = 4),
+    `embedding` Array(Float32)
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (severity, ts)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-warm">WARM</span> <code>sec_threat_intel</code> — 5 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.sec_threat_intel
+(
+    `indicator_id` UUID DEFAULT generateUUIDv4(),
+    `indicator_type` Enum8(&#x27;ip&#x27; = 1, &#x27;domain&#x27; = 2, &#x27;hash&#x27; = 3, &#x27;url&#x27; = 4, &#x27;email&#x27; = 5),
+    `indicator_val` String,
+    `threat_actor` String,
+    `campaign` String,
+    `ttps` Array(String),
+    `confidence` Float32,
+    `description` String,
+    `embedding` Array(Float32),
+    `first_seen` DateTime64(3),
+    `last_seen` DateTime64(3)
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(first_seen)
+ORDER BY (indicator_type, confidence)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>agent_memory_hot</code> — 0 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.agent_memory_hot
+(
+    `session_id` String,
+    `turn_id` UInt32,
+    `role` LowCardinality(String),
+    `content` String,
+    `tool_name` LowCardinality(String) DEFAULT &#x27;&#x27;,
+    `metadata` String DEFAULT &#x27;&#x27;,
+    `ts` DateTime64(3) DEFAULT now64()
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-warm">WARM</span> <code>agent_memory_long</code> — 0 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.agent_memory_long
+(
+    `memory_id` UUID DEFAULT generateUUIDv4(),
+    `user_id` String,
+    `agent_id` LowCardinality(String) DEFAULT &#x27;&#x27;,
+    `session_id` String,
+    `turn_id` UInt32 DEFAULT 0,
+    `role` LowCardinality(String) DEFAULT &#x27;assistant&#x27;,
+    `content` String,
+    `content_embedding` Array(Float32),
+    `memory_type` LowCardinality(String) DEFAULT &#x27;episodic&#x27;,
+    `importance` Float32 DEFAULT 0.5,
+    `ts` DateTime64(3) DEFAULT now64(),
+    INDEX embedding_idx content_embedding TYPE vector_similarity(&#x27;hnsw&#x27;, &#x27;cosineDistance&#x27;, 768) GRANULARITY 1000
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (user_id, ts, session_id)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-warm">WARM</span> <code>knowledge_base</code> — 0 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.knowledge_base
+(
+    `article_id` UUID DEFAULT generateUUIDv4(),
+    `title` String,
+    `content` String,
+    `content_embedding` Array(Float32),
+    `category` LowCardinality(String) DEFAULT &#x27;general&#x27;,
+    `tags` Array(String) DEFAULT [],
+    `created_at` DateTime64(3) DEFAULT now64(),
+    `updated_at` DateTime64(3) DEFAULT now64(),
+    `access_count` UInt32 DEFAULT 0,
+    INDEX embedding_idx content_embedding TYPE vector_similarity(&#x27;hnsw&#x27;, &#x27;cosineDistance&#x27;, 768) GRANULARITY 1000
+)
+ENGINE = MergeTree
+ORDER BY (category, article_id)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>obs_incident_workspace</code> — 0 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.obs_incident_workspace
+(
+    `incident_id` String,
+    `event_id` UUID,
+    `ts` DateTime64(3),
+    `service` String,
+    `host` String,
+    `level` String,
+    `message` String,
+    `trace_id` String,
+    `latency_ms` Float32,
+    `error_code` Nullable(String),
+    `added_at` DateTime64(3) DEFAULT now64()
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>sec_case_workspace</code> — 0 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.sec_case_workspace
+(
+    `case_id` String,
+    `event_id` UUID,
+    `ts` DateTime64(3),
+    `event_type` String,
+    `user_id` String,
+    `asset_id` String,
+    `src_ip` String,
+    `action` String,
+    `outcome` String,
+    `severity` String,
+    `added_at` DateTime64(3) DEFAULT now64()
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>telco_fault_workspace</code> — 0 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.telco_fault_workspace
+(
+    `fault_id` String,
+    `element_id` String,
+    `ts` DateTime64(3),
+    `metric` String,
+    `value` Float32,
+    `threshold` Float32,
+    `severity` String,
+    `added_at` DateTime64(3) DEFAULT now64()
+)
+ENGINE = Memory</pre>
+          </details>
+        
+      </div>
+    </article>
+    
+    
+    <article class="scenario">
+      <h2 class="scenario-title">Scenario 1 — HOT alone: what just happened on this service?</h2>
+      <p class="user-question"><strong>User asks:</strong> What is happening on svc-orders right now?</p>
+      <p class="anticipated"><strong>Answer shape:</strong> Top N error events from the live stream in the last 15 minutes.</p>
+      <div class="scenario-totals">
+        <span><strong>Tools called:</strong> 1</span>
+        <span><strong>Total rows read:</strong> 200</span>
+        <span><strong>Total bytes read:</strong> 27.5 KB</span>
+        <span><strong>Sum client p50:</strong> 2.3 ms</span>
+      </div>
+      
+    <section class="step">
+      <header class="step-head">
+        <span class="tier tier-hot">HOT</span>
+        <h3>search_events</h3>
+        <span class="dialect">ClickHouse SQL</span>
+      </header>
+      <p class="desc">Tail the live observability event stream (Memory engine).</p>
+
+      <div class="metrics">
+        <table>
+          <thead>
+            <tr>
+              <th colspan="3">Client-measured (10 iterations)</th>
+              <th colspan="4">system.query_log (last run)</th>
+            </tr>
+            <tr>
+              <th>p50</th><th>p95</th><th>max</th>
+              <th>bytes read</th><th>rows read</th><th>CH duration</th><th>memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2.27 ms</td>
+              <td>20.0 ms</td>
+              <td>20.0 ms</td>
+              <td>27.5 KB</td><td>200</td><td>1 ms</td><td>5.27 MB</td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+
+      <details open>
+        <summary>Query text (14 lines)</summary>
+        <pre class="code">-- HOT tier: live event stream for the observability domain.
+        -- obs_events_stream uses ENGINE = Memory, so this read is sub-5ms
+        -- and the data is volatile (cleared on container restart).
+        SELECT event_id, ts, service, host, level, message,
+               latency_ms, error_code, trace_id
+        FROM enterprise_memory.obs_events_stream
+        -- Narrow by service name if the caller gave one; otherwise match all.
+        WHERE (length({service:String}) = 0 OR service = {service:String})
+          -- Only errors + criticals; INFO / WARN are not useful for triage.
+          AND level IN (&#x27;ERROR&#x27;, &#x27;CRITICAL&#x27;)
+          -- Rolling window: last N minutes of the live stream.
+          AND ts &gt;= now() - INTERVAL {minutes:UInt32} MINUTE
+        ORDER BY ts DESC
+        LIMIT {limit:UInt32}</pre>
+      </details>
+
+      <details open>
+        <summary>Bind parameters</summary>
+        <pre class="code">{
+  &quot;service&quot;: &quot;svc-orders&quot;,
+  &quot;minutes&quot;: 15,
+  &quot;limit&quot;: 50
+}</pre>
+      </details>
+
+      <details open>
+        <summary>Result — 2 rows returned (first 20 shown)</summary>
+        <pre class="code">[
+  {
+    &quot;event_id&quot;: &quot;3e288438-d3d8-4bbd-807a-c339482f7b89&quot;,
+    &quot;ts&quot;: &quot;2026-04-23 07:24:37.729&quot;,
+    &quot;service&quot;: &quot;svc-orders&quot;,
+    &quot;host&quot;: &quot;svc-orders-pod-2&quot;,
+    &quot;level&quot;: &quot;ERROR&quot;,
+    &quot;message&quot;: &quot;TLS handshake failed: certificate expired&quot;,
+    &quot;latency_ms&quot;: 314.11563,
+    &quot;error_code&quot;: &quot;CONN_REFUSED&quot;,
+    &quot;trace_id&quot;: &quot;trace-39693&quot;
+  },
+  {
+    &quot;event_id&quot;: &quot;640b385f-6d53-4393-b2df-ec06aa332982&quot;,
+    &quot;ts&quot;: &quot;2026-04-23 07:24:37.728&quot;,
+    &quot;service&quot;: &quot;svc-orders&quot;,
+    &quot;host&quot;: &quot;svc-orders-pod-1&quot;,
+    &quot;level&quot;: &quot;ERROR&quot;,
+    &quot;message&quot;: &quot;Deadlock detected in transaction&quot;,
+    &quot;latency_ms&quot;: 1219.699,
+    &quot;error_code&quot;: &quot;DB_TIMEOUT&quot;,
+    &quot;trace_id&quot;: &quot;trace-13783&quot;
+  }
+]</pre>
+      </details>
+    </section>
+    
+    </article>
+    
+
+    <article class="scenario">
+      <h2 class="scenario-title">Scenario 2 — WARM alone: have we seen this before?</h2>
+      <p class="user-question"><strong>User asks:</strong> Find past incidents that look like a database connection timeout on svc-orders.</p>
+      <p class="anticipated"><strong>Answer shape:</strong> K most similar historical incidents ranked by cosineDistance on a 768-d embedding.</p>
+      <div class="scenario-totals">
+        <span><strong>Tools called:</strong> 1</span>
+        <span><strong>Total rows read:</strong> 14</span>
+        <span><strong>Total bytes read:</strong> 25.8 KB</span>
+        <span><strong>Sum client p50:</strong> 5.7 ms</span>
+      </div>
+      
+    <section class="step">
+      <header class="step-head">
+        <span class="tier tier-warm">WARM</span>
+        <h3>semantic_search</h3>
+        <span class="dialect">ClickHouse SQL + HNSW</span>
+      </header>
+      <p class="desc">Filter-first semantic search: MergeTree WHERE then HNSW cosineDistance rank.</p>
+
+      <div class="metrics">
+        <table>
+          <thead>
+            <tr>
+              <th colspan="3">Client-measured (10 iterations)</th>
+              <th colspan="4">system.query_log (last run)</th>
+            </tr>
+            <tr>
+              <th>p50</th><th>p95</th><th>max</th>
+              <th>bytes read</th><th>rows read</th><th>CH duration</th><th>memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>5.72 ms</td>
+              <td>29.5 ms</td>
+              <td>29.5 ms</td>
+              <td>25.8 KB</td><td>14</td><td>4 ms</td><td>6.17 MB</td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+
+      <details open>
+        <summary>Query text (19 lines)</summary>
+        <pre class="code">-- WARM tier: SEMANTIC SEARCH over past observability incidents.
+        -- `embedding` is Array(Float32). cosineDistance returns 0 for an
+        -- identical vector and 2 for the opposite direction, so LOWER is
+        -- more similar. The HNSW index makes the ORDER BY LIMIT k fast.
+        --
+        -- Filter-first, rank-second: the ts window prunes whole monthly
+        -- partitions (PARTITION BY toYYYYMM(ts)) before HNSW sees a single
+        -- row. Rule: query-join-filter-before (filter before the expensive
+        -- op — here the expensive op is HNSW rank, not a JOIN).
+        SELECT incident_id, ts, title, affected_services,
+               root_cause, resolution,
+               toString(severity) AS severity, duration_min,
+               -- Rounded copy for display; the un-rounded form drives the sort.
+               round(cosineDistance(embedding, {emb}), 4) AS similarity_distance
+        FROM enterprise_memory.obs_historical_incidents
+        WHERE ts &gt;= now() - INTERVAL {days:UInt32} DAY
+        -- ORDER BY uses the un-rounded distance so the HNSW index kicks in.
+        ORDER BY cosineDistance(embedding, {emb}) ASC
+        LIMIT {k:UInt32}</pre>
+      </details>
+
+      <details open>
+        <summary>Bind parameters</summary>
+        <pre class="code">{
+  &quot;k&quot;: 5,
+  &quot;emb&quot;: &quot;&lt;real 768-d float32[] embedding seeded via Gemini, substituted inline because ClickHouse URL params don&#x27;t carry Array literals&gt;&quot;
+}</pre>
+      </details>
+
+      <details open>
+        <summary>Result — 5 rows returned (first 20 shown)</summary>
+        <pre class="code">[
+  {
+    &quot;incident_id&quot;: &quot;3bac012b-bd05-401c-9ece-504404eeaaef&quot;,
+    &quot;ts&quot;: &quot;2025-10-26 03:28:40.854&quot;,
+    &quot;title&quot;: &quot;Payment service database connection pool exhaustion&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-payments&quot;,
+      &quot;svc-orders&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Database connection pool limit set too low; connection leak in payment retry logic&quot;,
+    &quot;resolution&quot;: &quot;Increased pool size from 50 to 200, fixed connection leak, added circuit breaker&quot;,
+    &quot;severity&quot;: &quot;P1&quot;,
+    &quot;duration_min&quot;: 45,
+    &quot;similarity_distance&quot;: 0
+  },
+  {
+    &quot;incident_id&quot;: &quot;994e3a59-2580-49c9-9a6c-478b72413079&quot;,
+    &quot;ts&quot;: &quot;2026-03-28 11:28:40.854&quot;,
+    &quot;title&quot;: &quot;Payment service TLS certificate expiry causing 503s&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-payments&quot;,
+      &quot;svc-orders&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Certificate renewal automation failed silently 30 days prior; no alerting on expiry&quot;,
+    &quot;resolution&quot;: &quot;Renewed certificate, implemented cert-manager with 30-day pre-expiry alerts&quot;,
+    &quot;severity&quot;: &quot;P1&quot;,
+    &quot;duration_min&quot;: 8,
+    &quot;similarity_distance&quot;: 0.2783
+  },
+  {
+    &quot;incident_id&quot;: &quot;8a49a5ee-dc33-41b8-ae70-c5d76ed56193&quot;,
+    &quot;ts&quot;: &quot;2025-12-31 06:28:40.854&quot;,
+    &quot;title&quot;: &quot;Inventory service deadlock during flash sale&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-inventory&quot;,
+      &quot;svc-orders&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Optimistic locking not implemented; concurrent stock updates caused deadlock&quot;,
+    &quot;resolution&quot;: &quot;Implemented optimistic locking with retry, added Redis-based distributed lock&quot;,
+    &quot;severity&quot;: &quot;P2&quot;,
+    &quot;duration_min&quot;: 35,
+    &quot;similarity_distance&quot;: 0.2933
+  },
+  {
+    &quot;incident_id&quot;: &quot;6b1769d0-699d-4b74-91b4-cabc8afa819f&quot;,
+    &quot;ts&quot;: &quot;2025-12-08 07:28:40.854&quot;,
+    &quot;title&quot;: &quot;Search service memory leak causing OOM restarts&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-search&quot;,
+      &quot;svc-api-gateway&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Elasticsearch scroll API results not being cleared, accumulating in heap&quot;,
+    &quot;resolution&quot;: &quot;Fixed scroll cleanup, added memory limit alerts at 80% threshold&quot;,
+    &quot;severity&quot;: &quot;P2&quot;,
+    &quot;duration_min&quot;: 180,
+    &quot;similarity_distance&quot;: 0.3372
+  },
+  {
+    &quot;incident_id&quot;: &quot;3113be19-f79d-461d-816b-b73978316a43&quot;,
+    &quot;ts&quot;: &quot;2025-11-16 10:28:40.854&quot;,
+    &quot;title&quot;: &quot;Auth service JWT validation latency spike&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-auth&quot;,
+      &quot;svc-api-gateway&quot;,
+      &quot;svc-orders&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Redis cache for public keys expired simultaneously, causing mass key fetches&quot;,
+    &quot;resolution&quot;: &quot;Staggered cache TTL, added local in-process key cache with 5 min TTL&quot;,
+    &quot;severity&quot;: &quot;P1&quot;,
+    &quot;duration_min&quot;: 22,
+    &quot;similarity_distance&quot;: 0.3451
+  }
+]</pre>
+      </details>
+    </section>
+    
+    </article>
+    
+
+    <article class="scenario">
+      <h2 class="scenario-title">Scenario 3 — GRAPH alone: what breaks if this fails?</h2>
+      <p class="user-question"><strong>User asks:</strong> What services depend on svc-orders?</p>
+      <p class="anticipated"><strong>Answer shape:</strong> Upstream dependents up to 2 hops via SQL self-JOIN + UNION ALL on MergeTree edge tables.</p>
+      <div class="scenario-totals">
+        <span><strong>Tools called:</strong> 1</span>
+        <span><strong>Total rows read:</strong> 32</span>
+        <span><strong>Total bytes read:</strong> 922 B</span>
+        <span><strong>Sum client p50:</strong> 4.5 ms</span>
+      </div>
+      
+    <section class="step">
+      <header class="step-head">
+        <span class="tier tier-graph">GRAPH</span>
+        <h3>find_related_entities</h3>
+        <span class="dialect">ClickHouse SQL self-JOIN + UNION ALL</span>
+      </header>
+      <p class="desc">Upstream blast radius via self-JOIN on obs_dependencies, one branch per hop depth.</p>
+
+      <div class="metrics">
+        <table>
+          <thead>
+            <tr>
+              <th colspan="3">Client-measured (10 iterations)</th>
+              <th colspan="4">system.query_log (last run)</th>
+            </tr>
+            <tr>
+              <th>p50</th><th>p95</th><th>max</th>
+              <th>bytes read</th><th>rows read</th><th>CH duration</th><th>memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>4.53 ms</td>
+              <td>24.96 ms</td>
+              <td>24.96 ms</td>
+              <td>922 B</td><td>32</td><td>3 ms</td><td>5.57 MB</td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+
+      <details open>
+        <summary>Query text (34 lines)</summary>
+        <pre class="code">-- GRAPH tier: multi-hop dependency traversal for observability.
+        -- Question: &quot;who depends on &lt;service&gt;?&quot; (upstream blast radius).
+        --
+        -- Optimisations applied per clickhouse-best-practices:
+        --   * obs_dependencies has a bloom_filter skipping index on to_service
+        --     because ORDER BY (from_service, to_service) cannot prune on the
+        --     second key alone (rule: query-index-skipping-indices).
+        --   * JOIN to obs_services is 1:1 (service_id is the primary key of
+        --     that table), so LEFT ANY JOIN is used for smaller memory
+        --     footprint (rule: query-join-use-any).
+        --
+        -- Hop 1: direct dependents of the target service.
+        SELECT d.from_service AS related, s.criticality, s.team,
+               d.dep_type AS edge_type, d.latency_p99, 1 AS hops
+        FROM enterprise_memory.obs_dependencies d
+        LEFT ANY JOIN enterprise_memory.obs_services s
+               ON s.service_id = d.from_service
+        WHERE d.to_service = {entity:String}
+
+        UNION ALL
+
+        -- Hop 2: services that depend on services that depend on the target.
+        -- Only emitted when max_hops &gt;= 2. The subquery is filtered first
+        -- (rule: query-join-filter-before — same principle for IN lists).
+        SELECT d2.from_service, s2.criticality, s2.team,
+               d2.dep_type, d2.latency_p99, 2 AS hops
+        FROM enterprise_memory.obs_dependencies d2
+        LEFT ANY JOIN enterprise_memory.obs_services s2
+               ON s2.service_id = d2.from_service
+        WHERE d2.to_service IN (
+            SELECT from_service FROM enterprise_memory.obs_dependencies
+            WHERE to_service = {entity:String}
+        )
+        AND {max_hops:UInt32} &gt;= 2</pre>
+      </details>
+
+      <details open>
+        <summary>Bind parameters</summary>
+        <pre class="code">{
+  &quot;entity&quot;: &quot;svc-orders&quot;,
+  &quot;max_hops&quot;: 2
+}</pre>
+      </details>
+
+      <details open>
+        <summary>Result — 2 rows returned (first 20 shown)</summary>
+        <pre class="code">[
+  {
+    &quot;related&quot;: &quot;svc-analytics&quot;,
+    &quot;criticality&quot;: &quot;medium&quot;,
+    &quot;team&quot;: &quot;Data&quot;,
+    &quot;edge_type&quot;: &quot;async&quot;,
+    &quot;latency_p99&quot;: 8,
+    &quot;hops&quot;: 1
+  },
+  {
+    &quot;related&quot;: &quot;svc-api-gateway&quot;,
+    &quot;criticality&quot;: &quot;critical&quot;,
+    &quot;team&quot;: &quot;Platform&quot;,
+    &quot;edge_type&quot;: &quot;sync&quot;,
+    &quot;latency_p99&quot;: 45,
+    &quot;hops&quot;: 1
+  }
+]</pre>
+      </details>
+    </section>
+    
+    </article>
+    
+
+    <article class="scenario">
+      <h2 class="scenario-title">Scenario 4 — MIXED: walk me through it</h2>
+      <p class="user-question"><strong>User asks:</strong> svc-orders is failing, walk me through it.</p>
+      <p class="anticipated"><strong>Answer shape:</strong> Live errors + similar past incident + hydrated runbook + blast radius, in one turn.</p>
+      <div class="scenario-totals">
+        <span><strong>Tools called:</strong> 4</span>
+        <span><strong>Total rows read:</strong> 248</span>
+        <span><strong>Total bytes read:</strong> 54.7 KB</span>
+        <span><strong>Sum client p50:</strong> 15.5 ms</span>
+      </div>
+      
+    <section class="step">
+      <header class="step-head">
+        <span class="tier tier-hot">HOT</span>
+        <h3>search_events</h3>
+        <span class="dialect">ClickHouse SQL</span>
+      </header>
+      <p class="desc">Tail the live observability event stream (Memory engine).</p>
+
+      <div class="metrics">
+        <table>
+          <thead>
+            <tr>
+              <th colspan="3">Client-measured (10 iterations)</th>
+              <th colspan="4">system.query_log (last run)</th>
+            </tr>
+            <tr>
+              <th>p50</th><th>p95</th><th>max</th>
+              <th>bytes read</th><th>rows read</th><th>CH duration</th><th>memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2.38 ms</td>
+              <td>2.74 ms</td>
+              <td>2.74 ms</td>
+              <td>27.5 KB</td><td>200</td><td>1 ms</td><td>5.27 MB</td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+
+      <details open>
+        <summary>Query text (14 lines)</summary>
+        <pre class="code">-- HOT tier: live event stream for the observability domain.
+        -- obs_events_stream uses ENGINE = Memory, so this read is sub-5ms
+        -- and the data is volatile (cleared on container restart).
+        SELECT event_id, ts, service, host, level, message,
+               latency_ms, error_code, trace_id
+        FROM enterprise_memory.obs_events_stream
+        -- Narrow by service name if the caller gave one; otherwise match all.
+        WHERE (length({service:String}) = 0 OR service = {service:String})
+          -- Only errors + criticals; INFO / WARN are not useful for triage.
+          AND level IN (&#x27;ERROR&#x27;, &#x27;CRITICAL&#x27;)
+          -- Rolling window: last N minutes of the live stream.
+          AND ts &gt;= now() - INTERVAL {minutes:UInt32} MINUTE
+        ORDER BY ts DESC
+        LIMIT {limit:UInt32}</pre>
+      </details>
+
+      <details open>
+        <summary>Bind parameters</summary>
+        <pre class="code">{
+  &quot;service&quot;: &quot;svc-orders&quot;,
+  &quot;minutes&quot;: 15,
+  &quot;limit&quot;: 50
+}</pre>
+      </details>
+
+      <details open>
+        <summary>Result — 2 rows returned (first 20 shown)</summary>
+        <pre class="code">[
+  {
+    &quot;event_id&quot;: &quot;3e288438-d3d8-4bbd-807a-c339482f7b89&quot;,
+    &quot;ts&quot;: &quot;2026-04-23 07:24:37.729&quot;,
+    &quot;service&quot;: &quot;svc-orders&quot;,
+    &quot;host&quot;: &quot;svc-orders-pod-2&quot;,
+    &quot;level&quot;: &quot;ERROR&quot;,
+    &quot;message&quot;: &quot;TLS handshake failed: certificate expired&quot;,
+    &quot;latency_ms&quot;: 314.11563,
+    &quot;error_code&quot;: &quot;CONN_REFUSED&quot;,
+    &quot;trace_id&quot;: &quot;trace-39693&quot;
+  },
+  {
+    &quot;event_id&quot;: &quot;640b385f-6d53-4393-b2df-ec06aa332982&quot;,
+    &quot;ts&quot;: &quot;2026-04-23 07:24:37.728&quot;,
+    &quot;service&quot;: &quot;svc-orders&quot;,
+    &quot;host&quot;: &quot;svc-orders-pod-1&quot;,
+    &quot;level&quot;: &quot;ERROR&quot;,
+    &quot;message&quot;: &quot;Deadlock detected in transaction&quot;,
+    &quot;latency_ms&quot;: 1219.699,
+    &quot;error_code&quot;: &quot;DB_TIMEOUT&quot;,
+    &quot;trace_id&quot;: &quot;trace-13783&quot;
+  }
+]</pre>
+      </details>
+    </section>
+    
+
+    <section class="step">
+      <header class="step-head">
+        <span class="tier tier-warm">WARM</span>
+        <h3>semantic_search</h3>
+        <span class="dialect">ClickHouse SQL + HNSW</span>
+      </header>
+      <p class="desc">Filter-first semantic search: MergeTree WHERE then HNSW cosineDistance rank.</p>
+
+      <div class="metrics">
+        <table>
+          <thead>
+            <tr>
+              <th colspan="3">Client-measured (10 iterations)</th>
+              <th colspan="4">system.query_log (last run)</th>
+            </tr>
+            <tr>
+              <th>p50</th><th>p95</th><th>max</th>
+              <th>bytes read</th><th>rows read</th><th>CH duration</th><th>memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>6.78 ms</td>
+              <td>20.73 ms</td>
+              <td>20.73 ms</td>
+              <td>25.8 KB</td><td>14</td><td>3 ms</td><td>6.18 MB</td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+
+      <details open>
+        <summary>Query text (19 lines)</summary>
+        <pre class="code">-- WARM tier: SEMANTIC SEARCH over past observability incidents.
+        -- `embedding` is Array(Float32). cosineDistance returns 0 for an
+        -- identical vector and 2 for the opposite direction, so LOWER is
+        -- more similar. The HNSW index makes the ORDER BY LIMIT k fast.
+        --
+        -- Filter-first, rank-second: the ts window prunes whole monthly
+        -- partitions (PARTITION BY toYYYYMM(ts)) before HNSW sees a single
+        -- row. Rule: query-join-filter-before (filter before the expensive
+        -- op — here the expensive op is HNSW rank, not a JOIN).
+        SELECT incident_id, ts, title, affected_services,
+               root_cause, resolution,
+               toString(severity) AS severity, duration_min,
+               -- Rounded copy for display; the un-rounded form drives the sort.
+               round(cosineDistance(embedding, {emb}), 4) AS similarity_distance
+        FROM enterprise_memory.obs_historical_incidents
+        WHERE ts &gt;= now() - INTERVAL {days:UInt32} DAY
+        -- ORDER BY uses the un-rounded distance so the HNSW index kicks in.
+        ORDER BY cosineDistance(embedding, {emb}) ASC
+        LIMIT {k:UInt32}</pre>
+      </details>
+
+      <details open>
+        <summary>Bind parameters</summary>
+        <pre class="code">{
+  &quot;k&quot;: 5,
+  &quot;emb&quot;: &quot;&lt;real 768-d float32[] embedding seeded via Gemini, substituted inline because ClickHouse URL params don&#x27;t carry Array literals&gt;&quot;
+}</pre>
+      </details>
+
+      <details open>
+        <summary>Result — 5 rows returned (first 20 shown)</summary>
+        <pre class="code">[
+  {
+    &quot;incident_id&quot;: &quot;3bac012b-bd05-401c-9ece-504404eeaaef&quot;,
+    &quot;ts&quot;: &quot;2025-10-26 03:28:40.854&quot;,
+    &quot;title&quot;: &quot;Payment service database connection pool exhaustion&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-payments&quot;,
+      &quot;svc-orders&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Database connection pool limit set too low; connection leak in payment retry logic&quot;,
+    &quot;resolution&quot;: &quot;Increased pool size from 50 to 200, fixed connection leak, added circuit breaker&quot;,
+    &quot;severity&quot;: &quot;P1&quot;,
+    &quot;duration_min&quot;: 45,
+    &quot;similarity_distance&quot;: 0
+  },
+  {
+    &quot;incident_id&quot;: &quot;994e3a59-2580-49c9-9a6c-478b72413079&quot;,
+    &quot;ts&quot;: &quot;2026-03-28 11:28:40.854&quot;,
+    &quot;title&quot;: &quot;Payment service TLS certificate expiry causing 503s&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-payments&quot;,
+      &quot;svc-orders&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Certificate renewal automation failed silently 30 days prior; no alerting on expiry&quot;,
+    &quot;resolution&quot;: &quot;Renewed certificate, implemented cert-manager with 30-day pre-expiry alerts&quot;,
+    &quot;severity&quot;: &quot;P1&quot;,
+    &quot;duration_min&quot;: 8,
+    &quot;similarity_distance&quot;: 0.2783
+  },
+  {
+    &quot;incident_id&quot;: &quot;8a49a5ee-dc33-41b8-ae70-c5d76ed56193&quot;,
+    &quot;ts&quot;: &quot;2025-12-31 06:28:40.854&quot;,
+    &quot;title&quot;: &quot;Inventory service deadlock during flash sale&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-inventory&quot;,
+      &quot;svc-orders&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Optimistic locking not implemented; concurrent stock updates caused deadlock&quot;,
+    &quot;resolution&quot;: &quot;Implemented optimistic locking with retry, added Redis-based distributed lock&quot;,
+    &quot;severity&quot;: &quot;P2&quot;,
+    &quot;duration_min&quot;: 35,
+    &quot;similarity_distance&quot;: 0.2933
+  },
+  {
+    &quot;incident_id&quot;: &quot;6b1769d0-699d-4b74-91b4-cabc8afa819f&quot;,
+    &quot;ts&quot;: &quot;2025-12-08 07:28:40.854&quot;,
+    &quot;title&quot;: &quot;Search service memory leak causing OOM restarts&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-search&quot;,
+      &quot;svc-api-gateway&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Elasticsearch scroll API results not being cleared, accumulating in heap&quot;,
+    &quot;resolution&quot;: &quot;Fixed scroll cleanup, added memory limit alerts at 80% threshold&quot;,
+    &quot;severity&quot;: &quot;P2&quot;,
+    &quot;duration_min&quot;: 180,
+    &quot;similarity_distance&quot;: 0.3372
+  },
+  {
+    &quot;incident_id&quot;: &quot;3113be19-f79d-461d-816b-b73978316a43&quot;,
+    &quot;ts&quot;: &quot;2025-11-16 10:28:40.854&quot;,
+    &quot;title&quot;: &quot;Auth service JWT validation latency spike&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-auth&quot;,
+      &quot;svc-api-gateway&quot;,
+      &quot;svc-orders&quot;
+    ],
+    &quot;root_cause&quot;: &quot;Redis cache for public keys expired simultaneously, causing mass key fetches&quot;,
+    &quot;resolution&quot;: &quot;Staggered cache TTL, added local in-process key cache with 5 min TTL&quot;,
+    &quot;severity&quot;: &quot;P1&quot;,
+    &quot;duration_min&quot;: 22,
+    &quot;similarity_distance&quot;: 0.3451
+  }
+]</pre>
+      </details>
+    </section>
+    
+
+    <section class="step">
+      <header class="step-head">
+        <span class="tier tier-warm">WARM</span>
+        <h3>get_record</h3>
+        <span class="dialect">ClickHouse SQL</span>
+      </header>
+      <p class="desc">Hydrate one historical incident by primary key.</p>
+
+      <div class="metrics">
+        <table>
+          <thead>
+            <tr>
+              <th colspan="3">Client-measured (10 iterations)</th>
+              <th colspan="4">system.query_log (last run)</th>
+            </tr>
+            <tr>
+              <th>p50</th><th>p95</th><th>max</th>
+              <th>bytes read</th><th>rows read</th><th>CH duration</th><th>memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2.11 ms</td>
+              <td>3.09 ms</td>
+              <td>3.09 ms</td>
+              <td>525 B</td><td>2</td><td>0 ms</td><td>5.18 MB</td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+
+      <details open>
+        <summary>Query text (7 lines)</summary>
+        <pre class="code">-- WARM tier: FETCH A RUNBOOK BY ID.
+        -- Deterministic lookup: no vector math, just the full
+        -- historical incident row so the agent can quote the resolution.
+        SELECT incident_id, title, root_cause, resolution,
+               duration_min, toString(severity) AS severity, affected_services
+        FROM enterprise_memory.obs_historical_incidents
+        WHERE incident_id = {identifier:String}</pre>
+      </details>
+
+      <details open>
+        <summary>Bind parameters</summary>
+        <pre class="code">{
+  &quot;identifier&quot;: &quot;994e3a59-2580-49c9-9a6c-478b72413079&quot;
+}</pre>
+      </details>
+
+      <details open>
+        <summary>Result — 1 rows returned (first 20 shown)</summary>
+        <pre class="code">[
+  {
+    &quot;incident_id&quot;: &quot;994e3a59-2580-49c9-9a6c-478b72413079&quot;,
+    &quot;title&quot;: &quot;Payment service TLS certificate expiry causing 503s&quot;,
+    &quot;root_cause&quot;: &quot;Certificate renewal automation failed silently 30 days prior; no alerting on expiry&quot;,
+    &quot;resolution&quot;: &quot;Renewed certificate, implemented cert-manager with 30-day pre-expiry alerts&quot;,
+    &quot;duration_min&quot;: 8,
+    &quot;severity&quot;: &quot;P1&quot;,
+    &quot;affected_services&quot;: [
+      &quot;svc-payments&quot;,
+      &quot;svc-orders&quot;
+    ]
+  }
+]</pre>
+      </details>
+    </section>
+    
+
+    <section class="step">
+      <header class="step-head">
+        <span class="tier tier-graph">GRAPH</span>
+        <h3>find_related_entities</h3>
+        <span class="dialect">ClickHouse SQL self-JOIN + UNION ALL</span>
+      </header>
+      <p class="desc">Upstream blast radius via self-JOIN on obs_dependencies, one branch per hop depth.</p>
+
+      <div class="metrics">
+        <table>
+          <thead>
+            <tr>
+              <th colspan="3">Client-measured (10 iterations)</th>
+              <th colspan="4">system.query_log (last run)</th>
+            </tr>
+            <tr>
+              <th>p50</th><th>p95</th><th>max</th>
+              <th>bytes read</th><th>rows read</th><th>CH duration</th><th>memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>4.24 ms</td>
+              <td>6.51 ms</td>
+              <td>6.51 ms</td>
+              <td>922 B</td><td>32</td><td>3 ms</td><td>5.56 MB</td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+
+      <details open>
+        <summary>Query text (34 lines)</summary>
+        <pre class="code">-- GRAPH tier: multi-hop dependency traversal for observability.
+        -- Question: &quot;who depends on &lt;service&gt;?&quot; (upstream blast radius).
+        --
+        -- Optimisations applied per clickhouse-best-practices:
+        --   * obs_dependencies has a bloom_filter skipping index on to_service
+        --     because ORDER BY (from_service, to_service) cannot prune on the
+        --     second key alone (rule: query-index-skipping-indices).
+        --   * JOIN to obs_services is 1:1 (service_id is the primary key of
+        --     that table), so LEFT ANY JOIN is used for smaller memory
+        --     footprint (rule: query-join-use-any).
+        --
+        -- Hop 1: direct dependents of the target service.
+        SELECT d.from_service AS related, s.criticality, s.team,
+               d.dep_type AS edge_type, d.latency_p99, 1 AS hops
+        FROM enterprise_memory.obs_dependencies d
+        LEFT ANY JOIN enterprise_memory.obs_services s
+               ON s.service_id = d.from_service
+        WHERE d.to_service = {entity:String}
+
+        UNION ALL
+
+        -- Hop 2: services that depend on services that depend on the target.
+        -- Only emitted when max_hops &gt;= 2. The subquery is filtered first
+        -- (rule: query-join-filter-before — same principle for IN lists).
+        SELECT d2.from_service, s2.criticality, s2.team,
+               d2.dep_type, d2.latency_p99, 2 AS hops
+        FROM enterprise_memory.obs_dependencies d2
+        LEFT ANY JOIN enterprise_memory.obs_services s2
+               ON s2.service_id = d2.from_service
+        WHERE d2.to_service IN (
+            SELECT from_service FROM enterprise_memory.obs_dependencies
+            WHERE to_service = {entity:String}
+        )
+        AND {max_hops:UInt32} &gt;= 2</pre>
+      </details>
+
+      <details open>
+        <summary>Bind parameters</summary>
+        <pre class="code">{
+  &quot;entity&quot;: &quot;svc-orders&quot;,
+  &quot;max_hops&quot;: 2
+}</pre>
+      </details>
+
+      <details open>
+        <summary>Result — 2 rows returned (first 20 shown)</summary>
+        <pre class="code">[
+  {
+    &quot;related&quot;: &quot;svc-analytics&quot;,
+    &quot;criticality&quot;: &quot;medium&quot;,
+    &quot;team&quot;: &quot;Data&quot;,
+    &quot;edge_type&quot;: &quot;async&quot;,
+    &quot;latency_p99&quot;: 8,
+    &quot;hops&quot;: 1
+  },
+  {
+    &quot;related&quot;: &quot;svc-api-gateway&quot;,
+    &quot;criticality&quot;: &quot;critical&quot;,
+    &quot;team&quot;: &quot;Platform&quot;,
+    &quot;edge_type&quot;: &quot;sync&quot;,
+    &quot;latency_p99&quot;: 45,
+    &quot;hops&quot;: 1
+  }
+]</pre>
+      </details>
+    </section>
+    
+    </article>
+    
+  </div>
+</body>
+</html>

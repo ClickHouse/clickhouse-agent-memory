@@ -1,0 +1,299 @@
+{
+  "agent_preset": "ai-netops-agent",
+  "agent_label": "AI NetOps Agent (Telco)",
+  "user_id": "u-maruthi",
+  "question": "core-router-01 is degraded, assess the impact and find a past fix",
+  "started_at": "2026-04-19T11:05:06+00:00",
+  "brute_force_baseline_bytes": 1500000000,
+  "brute_force_baseline_latency_s": 25,
+  "steps": [
+    {
+      "operation_label": "Live element state",
+      "reasoning": "Picked scan_live_stream because the user asked about 'core-router-01' current state. telco_network_state is a Memory-engine live mirror of SNMP/telemetry pollers, sub-5ms to read, and we filter by element + health predicate so the scan stays tight.",
+      "insight_text": "1 unhealthy element(s). Worst: core-router-01 (up). This is the element to investigate.",
+      "envelope": {
+        "tier": "HOT",
+        "domain": "telco",
+        "operation": "scan_live_stream",
+        "latency_ms": 2.73,
+        "row_count": 1,
+        "insights": {
+          "filter_applied": "core-router-01",
+          "window_minutes": 15,
+          "worst_element": "core-router-01",
+          "status": "up"
+        },
+        "precision": {
+          "filters_applied": [
+            "filter=core-router-01",
+            "status IN ('degraded','down') OR error_rate > 1%",
+            "last_seen implied",
+            "LIMIT 20"
+          ],
+          "index_hint": "Memory engine (in-RAM, no secondary index, full table scan is cheap)",
+          "embedding_dim": null,
+          "rows_read": 12,
+          "bytes_read": 935,
+          "rows_returned": 1,
+          "selectivity": "8.33%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "element_id": "core-router-01",
+            "element_type": "core",
+            "vendor": "Cisco",
+            "region": "us-east",
+            "status": "up",
+            "cpu_pct": 66.4715576171875,
+            "mem_pct": 25.992977142333984,
+            "traffic_gbps": 370.3813781738281,
+            "error_rate": 0.16919830441474915,
+            "last_seen": "2026-04-19T11:02:52.749000"
+          }
+        ],
+        "sql": "-- HOT tier: live network element state (Memory engine).\n-- telco_network_state is updated by SNMP / telemetry pollers; each\n-- row is the latest-known state of one network element.\nSELECT element_id, element_type, vendor, region, status,\n       cpu_pct, mem_pct, traffic_gbps, error_rate, last_seen\nFROM enterprise_memory.telco_network_state\n-- Narrow by element, by region, or leave open (empty filter).\nWHERE (length({service:String}) = 0\n       OR element_id = {service:String}\n       OR region = {service:String})\n  -- Only unhealthy state: degraded/down, abnormal error rate, or\n  -- CPU over 80% -- anything we would want an operator to look at.\n  AND (status IN ('degraded', 'down')\n       OR error_rate > 0.01\n       OR cpu_pct > 80)\n-- Rank down first, then degraded, then sort by error rate.\nORDER BY\n  CASE status WHEN 'down' THEN 1 WHEN 'degraded' THEN 2 ELSE 3 END,\n  error_rate DESC\nLIMIT {limit:UInt32}"
+      }
+    },
+    {
+      "operation_label": "Fault workspace",
+      "reasoning": "Picked open_investigation because several elements may be correlated and we want a single case_id to scope the rest. telco_fault_workspace gives us a grouped-by-element view in one query.",
+      "insight_text": "Fault workspace FAULT-1776596706 materialised: 12 event(s) across 12 element grouping(s).",
+      "envelope": {
+        "tier": "HOT",
+        "domain": "telco",
+        "operation": "open_investigation",
+        "latency_ms": 3.19,
+        "row_count": 12,
+        "insights": {
+          "case_id": "FAULT-1776596706",
+          "workspace_table": "telco_fault_workspace",
+          "groups_summarised": 12,
+          "events_loaded": 12
+        },
+        "precision": {
+          "filters_applied": [
+            "case_id=FAULT-1776596706",
+            "group by service / element / event_type"
+          ],
+          "index_hint": "Memory engine (INSERT ... SELECT + GROUP BY, single-pass)",
+          "embedding_dim": null,
+          "rows_read": 12,
+          "bytes_read": 744,
+          "rows_returned": 12,
+          "selectivity": "100.0%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "element_id": "bs-brooklyn-01",
+            "severity": "up",
+            "events": 1,
+            "avg_error_rate": 2.3912,
+            "max_error_rate": 2.391200065612793
+          },
+          {
+            "element_id": "core-router-02",
+            "severity": "up",
+            "events": 1,
+            "avg_error_rate": 2.1833,
+            "max_error_rate": 2.183300018310547
+          },
+          {
+            "element_id": "edge-router-01",
+            "severity": "up",
+            "events": 1,
+            "avg_error_rate": 1.9713,
+            "max_error_rate": 1.9713000059127808
+          }
+        ],
+        "sql": "-- HOT tier: open a fault workspace for this case_id.\n        -- Each row pairs the fault_id with the element + its current\n        -- error_rate so the follow-up summary step can group by element.\n        INSERT INTO enterprise_memory.telco_fault_workspace\n        SELECT\n            {case_id:String} AS fault_id,\n            element_id,\n            last_seen AS ts,\n            'composite' AS metric,\n            error_rate AS value,\n            0.01 AS threshold,\n            status AS severity,\n            now64() AS added_at\n        FROM enterprise_memory.telco_network_state\n        -- Unhealthy elements only: degraded/down or above the error threshold.\n        WHERE status IN ('degraded', 'down') OR error_rate > 0.01\n\n\n-- Group by the natural key so we see the fault shape:\n\n        -- Group the fault workspace by element + severity so one row per\n        -- element shows the worst and average error rate the agent saw.\n        SELECT element_id, severity,\n               count() AS events,\n               round(avg(value), 4) AS avg_error_rate,\n               round(max(value), 4) AS max_error_rate\n        FROM enterprise_memory.telco_fault_workspace\n        WHERE fault_id = {case_id:String}\n        GROUP BY element_id, severity\n        ORDER BY max_error_rate DESC"
+      }
+    },
+    {
+      "operation_label": "Semantic search",
+      "reasoning": "Picked semantic_search because the user wants 'have we seen this fault shape before'. telco_network_events has a vector index so ranking by cosineDistance finds past faults with similar symptom text.",
+      "insight_text": "Top historical match: \"Core router line card failure causing 30% traffic loss on backbone\" at cosineDistance 0.2024. Root cause: Faulty ASIC on line card LC-7 due to manufacturing defect.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "telco",
+        "operation": "semantic_search",
+        "latency_ms": 16.24,
+        "row_count": 3,
+        "insights": {
+          "query_text": "core-router-01 packet loss hardware failure degraded",
+          "k": 3,
+          "top_match": "Core router line card failure causing 30% traffic loss on backbone",
+          "similarity_distance": 0.2024,
+          "top_root_cause": "Faulty ASIC on line card LC-7 due to manufacturing defect"
+        },
+        "precision": {
+          "filters_applied": [
+            "ORDER BY cosineDistance(embedding, query_vec) ASC",
+            "LIMIT 3"
+          ],
+          "index_hint": "HNSW vector_similarity('hnsw', 'cosineDistance', 768) on `embedding` column",
+          "embedding_dim": 768,
+          "rows_read": 10,
+          "bytes_read": 22344,
+          "rows_returned": 3,
+          "selectivity": "30.0%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "event_id": "45ed9769-eac2-48df-bc9c-c4ed3ea868c4",
+            "ts": "2025-04-19T20:03:22.587000",
+            "element_id": "core-router-01",
+            "event_type": "hardware_failure",
+            "description": "Core router line card failure causing 30% traffic loss on backbone",
+            "root_cause": "Faulty ASIC on line card LC-7 due to manufacturing defect",
+            "resolution": "Hot-swapped line card, traffic rerouted via backup path during replacement",
+            "impact_score": 9.199999809265137,
+            "customers_aff": 45000,
+            "similarity_distance": 0.2024
+          },
+          {
+            "event_id": "ef394731-0555-4287-9035-8c6860e962a6",
+            "ts": "2026-02-14T05:03:22.587000",
+            "element_id": "core-router-02",
+            "event_type": "software_bug",
+            "description": "Memory leak in routing daemon causing gradual performance degradation",
+            "root_cause": "Known bug in JunOS 21.2R1 with IS-IS route reflector",
+            "resolution": "Upgraded to JunOS 21.4R2, memory leak resolved",
+            "impact_score": 4.5,
+            "customers_aff": 15000,
+            "similarity_distance": 0.3639
+          },
+          {
+            "event_id": "b4ca3355-24b3-4696-871e-c219acf562cf",
+            "ts": "2025-09-17T06:03:22.587000",
+            "element_id": "edge-router-02",
+            "event_type": "bgp_flap",
+            "description": "BGP session flapping causing route instability in Boston PoP",
+            "root_cause": "MTU mismatch after upstream provider maintenance window",
+            "resolution": "Corrected MTU settings on both sides, BGP session stabilised",
+            "impact_score": 5.0,
+            "customers_aff": 3000,
+            "similarity_distance": 0.3732
+          }
+        ],
+        "sql": "-- WARM tier: SEMANTIC SEARCH over past telco network events.\n-- Same pattern: cosineDistance over the event description vector.\nSELECT event_id, ts, element_id, event_type, description,\n       root_cause, resolution, impact_score, customers_aff,\n       round(cosineDistance(embedding, [<query embedding vector>]), 4) AS similarity_distance\nFROM enterprise_memory.telco_network_events\nORDER BY cosineDistance(embedding, [<query embedding vector>]) ASC\nLIMIT {k:UInt32}"
+      }
+    },
+    {
+      "operation_label": "Event fetch by id",
+      "reasoning": "Picked fetch_record(kind='runbook') to pull the full past-event row including resolution and customer-impact numbers. PK lookup on event_id; one row.",
+      "insight_text": "Past event fetched. Resolution: Hot-swapped line card, traffic rerouted via backup path during replacement. These are the concrete steps we would reapply.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "telco",
+        "operation": "fetch_runbook",
+        "latency_ms": 4.15,
+        "row_count": 1,
+        "insights": {
+          "kind": "runbook",
+          "identifier": "45ed9769-eac2-48df-bc9c-c4ed3ea868c4",
+          "query": null,
+          "matches": 1,
+          "resolution": "Hot-swapped line card, traffic rerouted via backup path during replacement"
+        },
+        "precision": {
+          "filters_applied": [
+            "WHERE incident_id = '45ed9769-eac2-48df-bc9c-c4ed3ea868c4'"
+          ],
+          "index_hint": "Primary-key lookup on incident_id (MergeTree ORDER BY prefix)",
+          "embedding_dim": null,
+          "rows_read": 7,
+          "bytes_read": 352,
+          "rows_returned": 1,
+          "selectivity": "14.29%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "event_id": "45ed9769-eac2-48df-bc9c-c4ed3ea868c4",
+            "element_id": "core-router-01",
+            "event_type": "hardware_failure",
+            "description": "Core router line card failure causing 30% traffic loss on backbone",
+            "root_cause": "Faulty ASIC on line card LC-7 due to manufacturing defect",
+            "resolution": "Hot-swapped line card, traffic rerouted via backup path during replacement",
+            "impact_score": 9.199999809265137,
+            "customers_aff": 45000
+          }
+        ],
+        "sql": "-- WARM tier: FETCH A NETWORK EVENT BY ID.\n-- Deterministic lookup for the resolution of a specific past event.\nSELECT event_id, element_id, event_type, description,\n       root_cause, resolution, impact_score, customers_aff\nFROM enterprise_memory.telco_network_events\nWHERE event_id = {identifier:String}"
+      }
+    },
+    {
+      "operation_label": "Topology traversal",
+      "reasoning": "Picked graph_traverse to map downstream topology impact. telco_connections JOIN telco_elements walks fiber / backhaul links one and two hops out from the fault element.",
+      "insight_text": "Downstream topology: 5 direct + 2 indirect elements. This is what loses service if the fault escalates.",
+      "envelope": {
+        "tier": "GRAPH",
+        "domain": "telco",
+        "operation": "graph_traverse",
+        "latency_ms": 8.71,
+        "row_count": 7,
+        "insights": {
+          "start_entity": "core-router-01",
+          "direct_neighbours": 5,
+          "indirect_neighbours": 2
+        },
+        "precision": {
+          "filters_applied": [
+            "start entity: core-router-01",
+            "max_hops=2",
+            "JOIN on service_id / element_id / asset_id (indexed PKs)"
+          ],
+          "index_hint": "MergeTree PK JOINs + UNION ALL over 1-hop and 2-hop branches",
+          "embedding_dim": null,
+          "rows_read": 57,
+          "bytes_read": 2218,
+          "rows_returned": 7,
+          "selectivity": "12.28%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "related": "core-router-02",
+            "element_type": "core",
+            "vendor": "Juniper",
+            "edge_type": "backbone",
+            "capacity_gbps": 400.0,
+            "latency_ms": 45.0,
+            "hops": 1
+          },
+          {
+            "related": "edge-router-01",
+            "element_type": "router",
+            "vendor": "Cisco",
+            "edge_type": "peering",
+            "capacity_gbps": 100.0,
+            "latency_ms": 2.0,
+            "hops": 1
+          },
+          {
+            "related": "edge-router-02",
+            "element_type": "router",
+            "vendor": "Cisco",
+            "edge_type": "peering",
+            "capacity_gbps": 100.0,
+            "latency_ms": 3.0,
+            "hops": 1
+          }
+        ],
+        "sql": "-- GRAPH tier: multi-hop topology traversal for telco.\n-- Question: \"what network elements are downstream of <element>?\"\n--\n-- Hop 1: direct downstream elements.\nSELECT c.to_element AS related, e.element_type, e.vendor,\n       c.link_type AS edge_type, c.capacity_gbps, c.latency_ms, 1 AS hops\nFROM enterprise_memory.telco_connections c\nJOIN enterprise_memory.telco_elements e ON e.element_id = c.to_element\nWHERE c.from_element = {entity:String}\n\nUNION ALL\n\n-- Hop 2: downstream-of-downstream (two fiber/link hops out).\nSELECT c2.to_element, e2.element_type, e2.vendor,\n       c2.link_type, c2.capacity_gbps, c2.latency_ms, 2 AS hops\nFROM enterprise_memory.telco_connections c2\nJOIN enterprise_memory.telco_elements e2 ON e2.element_id = c2.to_element\nWHERE c2.from_element IN (\n    SELECT to_element FROM enterprise_memory.telco_connections\n    WHERE from_element = {entity:String}\n)\nAND {max_hops:UInt32} >= 2"
+      }
+    }
+  ],
+  "final_brief": {
+    "fields": {
+      "Affected element": "core-router-01 (status: up)",
+      "Topology impact": "5 direct + 2 indirect downstream",
+      "Top historical match": "Core router line card failure causing 30% traffic loss on backbone (cosineDistance 0.2024)",
+      "Case id": "FAULT-1776596706"
+    },
+    "recommended": "Reapply the past resolution from the fetch_record step. If the fault cannot be hot-fixed, pre-reroute traffic away from the direct downstream elements in Step 5 before customer impact. Re-scan in 5 minutes to confirm health restored."
+  }
+}

@@ -1,0 +1,5 @@
+redis>=5.0
+pinecone>=4.0
+neo4j>=5.18
+psycopg2-binary>=2.9
+rich>=13.0

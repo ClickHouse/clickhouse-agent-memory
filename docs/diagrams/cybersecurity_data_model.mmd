@@ -1,0 +1,83 @@
+erDiagram
+    sec_events_stream ||--o{ sec_case_workspace : "loads into"
+    sec_threat_intel }o--o{ sec_historical_incidents : "correlates"
+    sec_users ||--o{ sec_access : "granted"
+    sec_assets ||--o{ sec_access : "target of"
+
+    sec_events_stream {
+        UUID event_id
+        DateTime64 ts
+        String event_type
+        String source_system
+        String user_id
+        String asset_id
+        String src_ip
+        String action
+        String outcome
+        Enum severity
+    }
+
+    sec_case_workspace {
+        String case_id
+        UUID event_id
+        DateTime64 ts
+        String event_type
+        String user_id
+        String asset_id
+        String src_ip
+        String severity
+    }
+
+    sec_historical_incidents {
+        UUID incident_id
+        DateTime64 ts
+        String incident_type
+        String title
+        String description
+        String threat_actor
+        Array ttps
+        String root_cause
+        String response
+        String outcome
+        Enum severity
+        Array embedding
+    }
+
+    sec_threat_intel {
+        UUID indicator_id
+        Enum indicator_type
+        String indicator_val
+        String threat_actor
+        String campaign
+        Array ttps
+        Float32 confidence
+        String description
+        Array embedding
+    }
+
+    sec_users {
+        String user_id
+        String username
+        String department
+        String role
+        Float32 risk_score
+        UInt8 mfa_enabled
+    }
+
+    sec_assets {
+        String asset_id
+        String hostname
+        String asset_type
+        String criticality
+        String owner_team
+        String data_class
+        String network_zone
+        String os
+    }
+
+    sec_access {
+        String user_id
+        String asset_id
+        String access_type
+        Date granted_date
+    }

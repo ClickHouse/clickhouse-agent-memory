@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Enterprise Agent Memory -- Designs</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #151923;
+    --border: #232836;
+    --text: #e6e8ef;
+    --text-dim: #9aa3b2;
+    --accent: #6ea8fe;
+    --hot: #f08080;
+    --warm: #f2c14e;
+    --graph: #8bd17c;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+  }
+  header {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #171b26 0%, #0f1115 100%);
+  }
+  header h1 { margin: 0 0 6px; font-size: 26px; }
+  header p { margin: 0; color: var(--text-dim); font-size: 14px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 0;
+  }
+  nav {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 18px;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    font-size: 13.5px;
+  }
+  nav h3 {
+    margin: 18px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  nav a {
+    display: block;
+    padding: 5px 8px;
+    margin: 2px 0;
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 6px;
+  }
+  nav a:hover { background: #202636; color: var(--accent); }
+  main {
+    padding: 28px 40px 80px;
+    max-width: 1280px;
+  }
+  section {
+    margin-bottom: 56px;
+    scroll-margin-top: 16px;
+  }
+  h2 {
+    font-size: 22px;
+    margin: 0 0 6px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+  h3 { font-size: 17px; margin: 18px 0 8px; }
+  .caption {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin: 0 0 14px;
+  }
+  .diagram {
+    background: #fafafa;
+    border-radius: 10px;
+    padding: 18px;
+    overflow: auto;
+    border: 1px solid var(--border);
+  }
+  .diagram svg { max-width: 100%; height: auto; }
+  .pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin-right: 6px;
+  }
+  .pill.hot   { background: rgba(240,128,128,0.18); color: var(--hot); }
+  .pill.warm  { background: rgba(242,193,78,0.18); color: var(--warm); }
+  .pill.graph { background: rgba(139,209,124,0.18); color: var(--graph); }
+  .pill.new   { background: rgba(110,168,254,0.18); color: var(--accent); }
+  .pill.gap   { background: rgba(255,99,99,0.18); color: #ff8080; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 6px;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { color: var(--text-dim); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  code, pre {
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  code { background: #20263a; padding: 1px 6px; border-radius: 4px; }
+  pre {
+    background: #0b0e15;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    color: #cfd6e4;
+  }
+  pre code { background: transparent; padding: 0; }
+  .callout {
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    background: #141a26;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+  }
+  .callout.warn { border-left-color: #ff8080; background: #1d1418; }
+  .callout h4 { margin: 0 0 4px; font-size: 14px; }
+  .tier-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 4px 0 16px;
+    font-size: 13px;
+  }
+  .tier-legend div { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .swatch.hot   { background: var(--hot); }
+  .swatch.warm  { background: var(--warm); }
+  .swatch.graph { background: var(--graph); }
+  footer {
+    padding: 20px 40px 40px;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 12.5px;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Enterprise Agent Memory -- Design Atlas</h1>
+  <p>Every architecture and data-flow diagram in one place, plus the LibreChat + MCP layer and the proposed conversation-memory extension.</p>
+</header>
+
+<div class="layout">
+<nav>
+  <h3>Overview</h3>
+  <a href="#summary">Summary</a>
+  <a href="#three-tier">Three-tier architecture</a>
+  <a href="#librechat">LibreChat + MCP layer</a>
+
+  <h3>Tier data flows</h3>
+  <a href="#hot-flow">HOT tier</a>
+  <a href="#warm-flow">WARM tier</a>
+  <a href="#graph-flow">GRAPH tier</a>
+
+  <h3>Domain data models</h3>
+  <a href="#obs-model">Observability</a>
+  <a href="#telco-model">Telco</a>
+  <a href="#cyber-model">Cybersecurity</a>
+
+  <h3>Workflow</h3>
+  <a href="#soc-workflow">AI SOC agent sequence</a>
+
+  <h3>Semantic memory</h3>
+  <a href="#semantic-gap">Gap analysis</a>
+  <a href="#conv-proposal">Proposed conversation memory</a>
+</nav>
+
+<main>
+
+<section id="summary">
+  <h2>Summary</h2>
+  <p class="caption">
+    One ClickHouse cluster hosts three memory tiers. HOT (Memory engine, sub-5 ms)
+    holds live streams and per-investigation workspaces. WARM (MergeTree + HNSW)
+    holds persistent, vector-searchable knowledge. GRAPH (SQL self-JOINs on MergeTree edge tables)
+    exposes relationships over the same tables. Two entry points consume this
+    cluster: the CLI cookbook runner and the new LibreChat UI via an MCP server.
+  </p>
+  <div class="tier-legend">
+    <div><span class="swatch hot"></span> HOT -- Memory engine</div>
+    <div><span class="swatch warm"></span> WARM -- MergeTree + vector</div>
+    <div><span class="swatch graph"></span> GRAPH -- SQL JOINs on MergeTree edges</div>
+  </div>
+</section>
+
+<!-- 1. Three-tier architecture -->
+<section id="three-tier">
+  <h2><span class="pill hot">HOT</span><span class="pill warm">WARM</span><span class="pill graph">GRAPH</span> Three-tier architecture</h2>
+  <p class="caption">How the three memory tiers map onto ClickHouse engines and which domain tables live where. This is the canonical view of the system.</p>
+  <div class="diagram">
+    <pre class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#dae8fc', 'primaryTextColor': '#333', 'lineColor': '#666'}}}%%
+graph TB
+    subgraph AGENT["AI Agent (CLI Cookbook Runner)"]
+        direction LR
+        SRE["SRE Agent<br/>Observability"]
+        NETOPS["NetOps Agent<br/>Telco"]
+        SOC["SOC Agent<br/>Cybersecurity"]
+    end
+
+    AGENT -->|"Step 1-2: Live data + workspace"| HOT
+    AGENT -->|"Step 3-5: Vector search + playbook"| WARM
+    AGENT -->|"Step 4: Dependency/topology traversal"| GRAPH
+
+    subgraph HOT["HOT MEMORY -- ClickHouse Memory Engine"]
+        direction TB
+        subgraph HOT_OBS["Observability"]
+            OES["obs_events_stream"]
+            OIW["obs_incident_workspace"]
+        end
+        subgraph HOT_TELCO["Telco"]
+            TNS["telco_network_state"]
+            TFW["telco_fault_workspace"]
+        end
+        subgraph HOT_SEC["Cybersecurity"]
+            SES["sec_events_stream"]
+            SCW["sec_case_workspace"]
+        end
+    end
+
+    subgraph WARM["WARM MEMORY -- MergeTree + cosineDistance Vector Search"]
+        direction TB
+        OHI["obs_historical_incidents"]
+        TNE["telco_network_events"]
+        SHI["sec_historical_incidents"]
+        STI["sec_threat_intel"]
+    end
+
+    subgraph GRAPH["GRAPH MEMORY -- SQL JOINs on MergeTree edge tables"]
+        direction TB
+        subgraph GRAPH_OBS["Observability"]
+            OS["obs_services"]
+            OD["obs_dependencies"]
+        end
+        subgraph GRAPH_TELCO["Telco"]
+            TE["telco_elements"]
+            TC["telco_connections"]
+        end
+        subgraph GRAPH_SEC["Cybersecurity"]
+            SA["sec_assets"]
+            SU["sec_users"]
+            SAC["sec_access"]
+        end
+    end
+
+    HOT --> CH
+    WARM --> CH
+    GRAPH --> CH
+
+    CH[("ClickHouse 26.3<br/>Single Unified Engine")]
+
+    style AGENT fill:#e1d5e7,stroke:#9673a6,color:#333
+    style HOT fill:#f8cecc,stroke:#b85450
+    style WARM fill:#dae8fc,stroke:#6c8ebf
+    style GRAPH fill:#d5e8d4,stroke:#82b366
+    style CH fill:#f0f0f0,stroke:#333
+    </pre>
+  </div>
+</section>
+
+<!-- 2. LibreChat + MCP -->
+<section id="librechat">
+  <h2><span class="pill new">NEW</span> LibreChat + Memory MCP layer</h2>
+  <p class="caption">
+    The LibreChat UI connects to an MCP server (FastMCP, streamable-http) that
+    exposes five memory tools over the same ClickHouse cluster the CLI cookbooks
+    use. Both entry points hit identical tables, so demos are symmetric.
+  </p>
+  <div class="diagram">
+    <pre class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#dae8fc', 'lineColor': '#666'}}}%%
+flowchart TB
+    subgraph PROVIDERS["LLM Providers"]
+        GEM["Google Gemini<br/>(default)"]
+        OAI["OpenAI"]
+        ANT["Anthropic"]
+        OLL["Ollama (local)"]
+    end
+
+    subgraph UI["LibreChat UI -- http://localhost:3080"]
+        CHAT["Chat + Agents panel"]
+        SPECS["modelSpecs presets<br/>SRE / NetOps / SOC"]
+        AGENTS["Agents builder<br/>(MCP tool binding)"]
+    end
+
+    PROVIDERS --> UI
+
+    subgraph MCP["Memory MCP server (streamable-http, :8765)"]
+        direction TB
+        T1["memory_hot_scan"]
+        T2["memory_hot_workspace"]
+        T3["memory_warm_search"]
+        T4["memory_warm_lookup"]
+        T5["memory_graph_traverse"]
+    end
+
+    UI -->|"tool call over HTTP"| MCP
+
+    subgraph DATA["Enterprise Memory cluster"]
+        direction TB
+        HOT[("HOT Memory Engine<br/>event streams + workspaces")]
+        WARM[("WARM MergeTree + cosineDistance<br/>historical incidents + threat intel")]
+        GRAPH[("GRAPH SQL JOINs on MergeTree<br/>deps / topology / access")]
+    end
+
+    MCP --> HOT
+    MCP --> WARM
+    MCP --> GRAPH
+
+    subgraph CLI["CLI cookbook runner (parallel entry point)"]
+        SREA["observability"]
+        NET["telco"]
+        SOC["cybersecurity"]
+    end
+
+    CLI --> HOT
+    CLI --> WARM
+    CLI --> GRAPH
+
+    style UI fill:#e1d5e7,stroke:#9673a6
+    style MCP fill:#fff2cc,stroke:#d6b656
+    style DATA fill:#f5f5f5,stroke:#999
+    style CLI fill:#d5e8d4,stroke:#82b366
+    style PROVIDERS fill:#f5f5f5,stroke:#999
+    </pre>
+  </div>
+  <h3>MCP tool surface</h3>
+  <table>
+    <thead><tr><th>Tool</th><th>Tier</th><th>Operation</th></tr></thead>
+    <tbody>
+      <tr><td><code>memory_hot_scan</code></td><td>HOT</td><td>Scan live event / state stream for a domain</td></tr>
+      <tr><td><code>memory_hot_workspace</code></td><td>HOT</td><td>Materialise per-case workspace + grouped summary</td></tr>
+      <tr><td><code>memory_warm_search</code></td><td>WARM</td><td>Cosine-similarity over historical incidents / events</td></tr>
+      <tr><td><code>memory_warm_lookup</code></td><td>WARM</td><td>Full runbook by id OR threat-intel vector lookup</td></tr>
+      <tr><td><code>memory_graph_traverse</code></td><td>GRAPH</td><td>Multi-hop traversal across deps / topology / access</td></tr>
+    </tbody>
+  </table>
+  <p class="caption">Every tool returns a uniform envelope <code>{tier, tier_engine, sql, latency_ms, row_count, rows_preview, insights}</code> so LibreChat renders the HOT / WARM / GRAPH narrative inline.</p>
+</section>
+
+<!-- 3. HOT tier data flow -->
+<section id="hot-flow">
+  <h2><span class="pill hot">HOT</span> tier data flow</h2>
+  <p class="caption">Live event streams (Memory engine) feed per-investigation workspaces. Sub-5 ms reads, volatile across restarts.</p>
+  <div class="diagram">
+    <pre class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#f8cecc', 'lineColor': '#b85450'}}}%%
+flowchart TB
+    subgraph SOURCES["Data Sources"]
+        APP["Application Logs<br/>+ Metrics"]
+        NET["Network Telemetry<br/>SNMP / sFlow"]
+        SEC["SIEM / EDR / IAM<br/>Security Events"]
+    end
+
+    subgraph STREAMS["Event Streams -- Memory Engine"]
+        OES["obs_events_stream"]
+        TNS["telco_network_state"]
+        SES["sec_events_stream"]
+    end
+
+    APP -->|INSERT| OES
+    NET -->|INSERT| TNS
+    SEC -->|INSERT| SES
+
+    AGENT["AI Agent<br/>(CLI or MCP)"]
+    TOOL["memory_hot_scan<br/>memory_hot_workspace"]
+
+    AGENT --> TOOL
+    TOOL -->|"SELECT high-severity events"| OES
+
+    subgraph WORKSPACES["Investigation Workspaces -- Memory Engine"]
+        OIW["obs_incident_workspace"]
+        TFW["telco_fault_workspace"]
+        SCW["sec_case_workspace"]
+    end
+
+    TOOL -.->|"INSERT correlated rows"| OIW
+
+    subgraph PATTERN["HOT tier pattern"]
+        S1["1. Agent detects anomaly via SELECT on stream"]
+        S2["2. Agent creates workspace (INSERT)"]
+        S3["3. Agent queries correlated events"]
+        S4["4. Workspace drives subsequent WARM + GRAPH calls"]
+        S1 --> S2 --> S3 --> S4
+    end
+
+    style SOURCES fill:#f5f5f5,stroke:#999
+    style STREAMS fill:#f8cecc,stroke:#b85450
+    style WORKSPACES fill:#ffe6cc,stroke:#d79b00
+    style AGENT fill:#e1d5e7,stroke:#9673a6
+    style TOOL fill:#fff2cc,stroke:#d6b656
+    style PATTERN fill:#f5f5f5,stroke:#ccc
+    </pre>
+  </div>
+</section>
+
+<!-- 4. WARM tier data flow -->
+<section id="warm-flow">
+  <h2><span class="pill warm">WARM</span> tier data flow</h2>
+  <p class="caption">Historical records persisted in MergeTree with Array(Float32) embeddings. Queries embed the user text then rank by <code>cosineDistance</code>.</p>
+  <div class="diagram">
+    <pre class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#dae8fc', 'lineColor': '#6c8ebf'}}}%%
+flowchart TB
+    subgraph INGEST["Data Ingestion"]
+        RAW["Historical incidents, events, threat intel"]
+        EMB["embed(text) -> Array(Float32)"]
+        PROV["Gemini / OpenAI / Ollama / vLLM<br/>(deterministic fallback)"]
+        RAW --> EMB
+        EMB -.-> PROV
+    end
+
+    subgraph STORAGE["WARM Tier Storage -- MergeTree + Embeddings"]
+        OHI[("obs_historical_incidents")]
+        TNE[("telco_network_events")]
+        SHI[("sec_historical_incidents")]
+        STI[("sec_threat_intel")]
+    end
+
+    EMB -->|INSERT with embedding column| OHI
+
+    AGENT["AI Agent<br/>(CLI or MCP)"]
+
+    subgraph SEARCH["memory_warm_search / memory_warm_lookup"]
+        SS_EMB["embed(query)"]
+        SS_COS["cosineDistance(embedding, [...])"]
+        SS_EMB --> SS_COS
+    end
+
+    AGENT --> SS_EMB
+    SS_COS --> RESULTS[("Ranked top-k<br/>by similarity distance")]
+    SS_COS -.-> OHI
+    SS_COS -.-> SHI
+    SS_COS -.-> STI
+
+    style INGEST fill:#f5f5f5,stroke:#999
+    style STORAGE fill:#dae8fc,stroke:#6c8ebf
+    style AGENT fill:#e1d5e7,stroke:#9673a6
+    style SEARCH fill:#e1d5e7,stroke:#9673a6
+    style RESULTS fill:#fff2cc,stroke:#d6b656
+    </pre>
+  </div>
+</section>
+
+<!-- 5. GRAPH tier data flow -->
+<section id="graph-flow">
+  <h2><span class="pill graph">GRAPH</span> tier data flow</h2>
+  <p class="caption">Service dependencies, network topology, and user-asset access are modelled as ordinary ClickHouse MergeTree tables. Multi-hop traversal runs as SQL self-JOIN + UNION ALL. Measured 2-hop blast radius: ~3 ms p50.</p>
+  <div class="diagram">
+    <pre class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#d5e8d4', 'lineColor': '#82b366'}}}%%
+flowchart TB
+    subgraph OBS_GRAPH["Observability -- Service Dependency Graph"]
+        direction TB
+        GW(("svc-gateway"))
+        PAY(("svc-payments")):::alert
+        ORD(("svc-orders"))
+        PG_OBS(("svc-postgres"))
+        RED(("svc-redis"))
+        GW -->|depends_on| PAY
+        GW -->|depends_on| ORD
+        PAY -->|depends_on| PG_OBS
+        ORD -->|depends_on| RED
+    end
+
+    subgraph TELCO_GRAPH["Telco -- Network Topology Graph"]
+        direction TB
+        CR["core-rtr-01"]:::alert
+        AGG1["agg-sw-01"]
+        AGG2["agg-sw-02"]
+        ACC1["access-01"]
+        ACC2["access-02"]
+        CR -->|10G| AGG1
+        CR -->|10G| AGG2
+        AGG1 --> ACC1
+        AGG1 --> ACC2
+    end
+
+    subgraph SEC_GRAPH["Cybersecurity -- User-Asset Access Graph"]
+        direction TB
+        U1["admin-01"]
+        U2["dev-02"]
+        A1[("prod-db-01")]
+        A2["staging-app"]
+        VPN["vpn-gw"]:::alert
+        U1 -->|ssh| A1
+        U1 -->|rdp| VPN
+        U2 -->|https| A2
+        U2 -->|vpn| VPN
+    end
+
+    AGENT["AI Agent<br/>(CLI or MCP)"]
+    TOOL["memory_graph_traverse"]
+    AGENT --> TOOL
+    TOOL --> CH_JOIN
+    CH_JOIN[("ClickHouse SQL JOINs on MergeTree")]
+    CH_JOIN --> OBS_GRAPH
+    CH_JOIN --> TELCO_GRAPH
+    CH_JOIN --> SEC_GRAPH
+
+    classDef alert fill:#f8cecc,stroke:#b85450,font-weight:bold
+    style AGENT fill:#e1d5e7,stroke:#9673a6
+    style TOOL fill:#fff2cc,stroke:#d6b656
+    style CH_JOIN fill:#f0f0f0,stroke:#333
+    </pre>
+  </div>
+</section>
+
+<!-- 6. Observability data model -->
+<section id="obs-model">
+  <h2>Observability data model</h2>
+  <p class="caption">ER diagram: the five observability tables across HOT, WARM, and GRAPH tiers.</p>
+  <div class="diagram">
+    <pre class="mermaid">
+erDiagram
+    obs_events_stream ||--o{ obs_incident_workspace : "loads into"
+    obs_historical_incidents }o--o{ obs_services : "references"
+    obs_services ||--o{ obs_dependencies : "defines"
+
+    obs_events_stream {
+        UUID event_id
+        DateTime64 ts
+        String service
+        String host
+        Enum level
+        String message
+        String trace_id
+        Float32 latency_ms
+        String error_code
+    }
+    obs_incident_workspace {
+        String incident_id
+        UUID event_id
+        DateTime64 ts
+        String service
+        String level
+        String message
+        Float32 latency_ms
+    }
+    obs_historical_incidents {
+        UUID incident_id
+        DateTime64 ts
+        String title
+        String description
+        Array affected_services
+        String root_cause
+        String resolution
+        Enum severity
+        UInt32 duration_min
+        Array embedding
+    }
+    obs_services {
+        String service_id
+        String name
+        String team
+        String language
+        Enum criticality
+        String region
+    }
+    obs_dependencies {
+        String from_service
+        String to_service
+        String dep_type
+        Float32 latency_p99
+    }
+    </pre>
+  </div>
+</section>
+
+<!-- 7. Telco data model -->
+<section id="telco-model">
+  <h2>Telco data model</h2>
+  <p class="caption">ER diagram: five telco tables. <code>telco_network_state</code> is Memory-engine live state; <code>telco_network_events</code> carries embeddings for historical fault similarity search.</p>
+  <div class="diagram">
+    <pre class="mermaid">
+erDiagram
+    telco_network_state }o--o{ telco_elements : "tracks state of"
+    telco_network_state ||--o{ telco_fault_workspace : "loads into"
+    telco_elements ||--o{ telco_connections : "connects via"
+    telco_network_events }o--o{ telco_elements : "references"
+
+    telco_network_state {
+        String element_id
+        Enum element_type
+        String vendor
+        String region
+        Enum status
+        Float32 cpu_pct
+        Float32 mem_pct
+        Float32 traffic_gbps
+        Float32 error_rate
+        DateTime64 last_seen
+    }
+    telco_fault_workspace {
+        String fault_id
+        String element_id
+        DateTime64 ts
+        String metric
+        Float32 value
+        Float32 threshold
+        String severity
+    }
+    telco_network_events {
+        UUID event_id
+        DateTime64 ts
+        String element_id
+        String event_type
+        String description
+        String root_cause
+        String resolution
+        Float32 impact_score
+        UInt32 customers_aff
+        Array embedding
+    }
+    telco_elements {
+        String element_id
+        String element_type
+        String vendor
+        String model
+        String region
+        String site
+        Date install_date
+        String criticality
+    }
+    telco_connections {
+        String from_element
+        String to_element
+        String link_type
+        Float32 capacity_gbps
+        Float32 latency_ms
+    }
+    </pre>
+  </div>
+</section>
+
+<!-- 8. Cyber data model -->
+<section id="cyber-model">
+  <h2>Cybersecurity data model</h2>
+  <p class="caption">ER diagram: seven cybersecurity tables. Two WARM-tier tables (<code>sec_threat_intel</code>, <code>sec_historical_incidents</code>) carry embeddings.</p>
+  <div class="diagram">
+    <pre class="mermaid">
+erDiagram
+    sec_events_stream ||--o{ sec_case_workspace : "loads into"
+    sec_threat_intel }o--o{ sec_historical_incidents : "correlates"
+    sec_users ||--o{ sec_access : "granted"
+    sec_assets ||--o{ sec_access : "target of"
+
+    sec_events_stream {
+        UUID event_id
+        DateTime64 ts
+        String event_type
+        String source_system
+        String user_id
+        String asset_id
+        String src_ip
+        String action
+        String outcome
+        Enum severity
+    }
+    sec_case_workspace {
+        String case_id
+        UUID event_id
+        DateTime64 ts
+        String event_type
+        String user_id
+        String asset_id
+        String src_ip
+        String severity
+    }
+    sec_historical_incidents {
+        UUID incident_id
+        DateTime64 ts
+        String incident_type
+        String title
+        String description
+        String threat_actor
+        Array ttps
+        String root_cause
+        String response
+        String outcome
+        Enum severity
+        Array embedding
+    }
+    sec_threat_intel {
+        UUID indicator_id
+        Enum indicator_type
+        String indicator_val
+        String threat_actor
+        String campaign
+        Array ttps
+        Float32 confidence
+        String description
+        Array embedding
+    }
+    sec_users {
+        String user_id
+        String username
+        String department
+        String role
+        Float32 risk_score
+        UInt8 mfa_enabled
+    }
+    sec_assets {
+        String asset_id
+        String hostname
+        String asset_type
+        String criticality
+        String owner_team
+        String data_class
+        String network_zone
+        String os
+    }
+    sec_access {
+        String user_id
+        String asset_id
+        String access_type
+        Date granted_date
+    }
+    </pre>
+  </div>
+</section>
+
+<!-- 9. SOC agent sequence -->
+<section id="soc-workflow">
+  <h2>AI SOC agent workflow (representative)</h2>
+  <p class="caption">End-to-end sequence showing how a single investigation walks HOT -> GRAPH -> WARM -> HOT -> synthesis.</p>
+  <div class="diagram">
+    <pre class="mermaid">
+sequenceDiagram
+    participant Events as sec_events_stream (HOT)
+    participant Agent as AI SOC Agent
+    participant Workspace as sec_case_workspace (HOT)
+    participant Graph as users + assets + access (GRAPH)
+    participant ThreatDB as sec_threat_intel (WARM)
+    participant History as sec_historical_incidents (WARM)
+
+    Note over Events,History: Step 1 -- HOT
+    Agent->>Events: SELECT high-severity events with triage scoring
+    Events-->>Agent: Top alert: login_success by user-006 from 185.220.101.47
+
+    Note over Events,History: Step 2 -- HOT
+    Agent->>Workspace: INSERT correlated events (same user / asset / IP, 60m)
+    Workspace-->>Agent: Case CASE-xxx with N events
+
+    Note over Events,History: Step 3 -- GRAPH
+    Agent->>Graph: SELECT user profile, asset criticality, access rights
+    Graph-->>Agent: User: DB Admin, MFA=NO; Asset: CRITICAL / PII
+
+    Note over Events,History: Step 4 -- WARM
+    Agent->>ThreatDB: Exact IoC lookup on IP + cosineDistance vector search
+    ThreatDB-->>Agent: MATCH FIN6 / Operation FinFisher, confidence 95%
+
+    Note over Events,History: Step 5 -- WARM
+    Agent->>History: cosineDistance vector search for similar attack patterns
+    History-->>Agent: Top match: admin account compromised via credential stuffing
+
+    Note over Events,History: Step 6 -- HOT
+    Agent->>Events: SELECT behaviour analytics for user-006 and src IP
+    Events-->>Agent: Behaviour risk score 0.70 (HIGH)
+
+    Note over Events,History: Step 7 -- RESULT
+    Agent->>Agent: Synthesise context, confidence 80%, response: IMMEDIATE suspension
+    </pre>
+  </div>
+</section>
+
+<!-- 10. Semantic memory gap -->
+<section id="semantic-gap">
+  <h2><span class="pill gap">GAP</span> Semantic / conversation-memory gap analysis</h2>
+  <p class="caption">
+    Where the system is today vs what "semantic memory for past conversations" requires.
+  </p>
+  <h3>What we already have</h3>
+  <table>
+    <thead><tr><th>Capability</th><th>Table</th><th>Embedding</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Semantic search over past incidents (obs)</td><td><code>obs_historical_incidents</code></td><td>yes, 768-d</td><td><span class="pill warm">WARM</span> implemented</td></tr>
+      <tr><td>Semantic search over past network events</td><td><code>telco_network_events</code></td><td>yes, 768-d</td><td><span class="pill warm">WARM</span> implemented</td></tr>
+      <tr><td>Semantic search over past security incidents</td><td><code>sec_historical_incidents</code></td><td>yes, 768-d</td><td><span class="pill warm">WARM</span> implemented</td></tr>
+      <tr><td>Semantic lookup of threat intel (IoCs / TTPs)</td><td><code>sec_threat_intel</code></td><td>yes, 768-d</td><td><span class="pill warm">WARM</span> implemented</td></tr>
+    </tbody>
+  </table>
+  <p class="caption">These are <em>domain artifact</em> semantic memories -- past incidents and intel. They cover "has this problem happened before" well.</p>
+
+  <h3>What is missing</h3>
+  <table>
+    <thead><tr><th>Capability</th><th>Intended home</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Recall of prior <em>agent-user conversation turns</em> ("what did this user ask me last week?")</td><td><code>agent_memory_long</code> (planned)</td><td><span class="pill gap">MISSING</span></td></tr>
+      <tr><td>Distilled user preferences / decisions ("the user prefers Gemini", "we agreed to SLO 99.9")</td><td><code>agent_memory_long</code> with <code>memory_type='semantic'</code></td><td><span class="pill gap">MISSING</span></td></tr>
+      <tr><td>Session working memory for the live chat (last N turns, scratchpad)</td><td><code>agent_memory_hot</code> (planned)</td><td><span class="pill gap">MISSING</span></td></tr>
+      <tr><td>Generic knowledge-base articles outside domain tables</td><td><code>knowledge_base</code> (planned)</td><td><span class="pill gap">MISSING</span></td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    <h4>Doc vs implementation drift</h4>
+    <p><code>docs/ARCHITECTURE.md</code> defines <code>memory_hot</code>, <code>memory_long</code> (episodic / procedural / semantic), and <code>knowledge_base</code> -- but the implemented schema (<code>cookbooks/shared/schema/01_schema.sql</code>) only creates the domain tables. LibreChat today stores its own chat history in MongoDB; nothing is vectorised for cross-session recall.</p>
+  </div>
+</section>
+
+<!-- 11. Proposal -->
+<section id="conv-proposal">
+  <h2><span class="pill new">PROPOSAL</span> Agent conversation memory layer</h2>
+  <p class="caption">
+    Close the gap with two tables mirroring the existing HOT + WARM pattern, and
+    three new MCP tools that slot into the same tier-annotated envelope. This
+    adds "agent remembers the user" without disturbing any domain logic.
+  </p>
+  <div class="diagram">
+    <pre class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#dae8fc', 'lineColor': '#666'}}}%%
+flowchart LR
+    subgraph SESSION["Current turn"]
+        USER["User message"]
+        AGENT["LLM agent"]
+    end
+    USER --> AGENT
+
+    subgraph HOT["HOT (Memory engine)"]
+        AMH[("agent_memory_hot<br/>session_id, turn_id, role,<br/>content, metadata, ts")]
+    end
+
+    subgraph WARM["WARM (MergeTree + HNSW)"]
+        AML[("agent_memory_long<br/>session_id, turn_id, role,<br/>content, content_embedding,<br/>memory_type, importance,<br/>user_id, agent_id, ts")]
+        KB[("knowledge_base<br/>article_id, title, content,<br/>content_embedding, tags")]
+    end
+
+    AGENT -->|"1. INSERT current turn"| AMH
+    AGENT -->|"2. memory_conversation_recall(query, user_id)<br/>cosineDistance over user's past turns"| AML
+    AGENT -->|"3. memory_conversation_remember(fact, user_id)<br/>distilled preference / decision"| AML
+    AGENT -->|"knowledge lookup"| KB
+
+    AMH -.->|"flush + embed every N min<br/>or on session close"| AML
+    AML -.->|"TTL 90d to cold"| COLD[("Cold object storage")]
+
+    TOOLS["Proposed MCP tools<br/>- memory_conversation_recall(user_id, query, k)<br/>- memory_conversation_remember(user_id, fact, kind)<br/>- memory_conversation_window(session_id, n)"]
+    AGENT --> TOOLS
+    TOOLS --> AMH
+    TOOLS --> AML
+
+    style SESSION fill:#e1d5e7,stroke:#9673a6
+    style HOT fill:#f8cecc,stroke:#b85450
+    style WARM fill:#dae8fc,stroke:#6c8ebf
+    style TOOLS fill:#fff2cc,stroke:#d6b656
+    </pre>
+  </div>
+
+  <h3>Table shapes</h3>
+  <pre><code>-- HOT: rolling live conversation (volatile)
+CREATE TABLE enterprise_memory.agent_memory_hot
+(
+    session_id    String,
+    turn_id       UInt32,
+    role          LowCardinality(String),    -- 'user' | 'assistant' | 'tool'
+    content       String,
+    tool_name     LowCardinality(String),
+    metadata      String,
+    ts            DateTime64(3) DEFAULT now64()
+) ENGINE = Memory;
+
+-- WARM: persistent, semantically searchable conversation memory
+CREATE TABLE enterprise_memory.agent_memory_long
+(
+    memory_id         UUID DEFAULT generateUUIDv4(),
+    user_id           String,
+    agent_id          LowCardinality(String),
+    session_id        String,
+    turn_id           UInt32,
+    role              LowCardinality(String),
+    content           String,
+    content_embedding Array(Float32),
+    memory_type       LowCardinality(String),   -- 'episodic' | 'procedural' | 'semantic'
+    importance        Float32 DEFAULT 0.5,
+    ts                DateTime64(3),
+    INDEX embedding_idx content_embedding TYPE hnsw(metric='cosine')
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(ts)
+ORDER BY (user_id, ts, session_id);</code></pre>
+
+  <h3>New MCP tools (to add under <code>cookbooks/mcp_server/</code>)</h3>
+  <table>
+    <thead><tr><th>Tool</th><th>Tier</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>memory_conversation_window</code></td>
+        <td><span class="pill hot">HOT</span></td>
+        <td>Return the last N turns for the current <code>session_id</code> straight from <code>agent_memory_hot</code>.</td>
+      </tr>
+      <tr>
+        <td><code>memory_conversation_recall</code></td>
+        <td><span class="pill warm">WARM</span></td>
+        <td>Embed the query, rank <code>agent_memory_long</code> rows for this <code>user_id</code> by <code>cosineDistance</code>. Answers "what did this user ask about payments last month?"</td>
+      </tr>
+      <tr>
+        <td><code>memory_conversation_remember</code></td>
+        <td><span class="pill warm">WARM</span></td>
+        <td>Distilled write: agent calls this to persist a fact (e.g. "user prefers Gemini", "runbook step 3 worked"). Row lands in <code>agent_memory_long</code> with <code>memory_type='semantic'</code> and a high importance score.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Lifecycle</h3>
+  <ol>
+    <li>Every chat turn is inserted into <code>agent_memory_hot</code> (sub-ms write).</li>
+    <li>A background flush (every 5-15 min, or on session close) embeds new turns and inserts into <code>agent_memory_long</code>.</li>
+    <li>Daily TTL moves rows older than 90 days to cold storage.</li>
+    <li>The agent calls <code>memory_conversation_recall</code> at the start of a session to seed context with relevant past exchanges.</li>
+  </ol>
+
+  <div class="callout">
+    <h4>Recommendation</h4>
+    <p>Add this as a focused follow-up PR: two DDL files, one seeder for demo turns, three new MCP tools, and a short system-prompt update for each preset so the agent knows when to <em>recall</em> and when to <em>remember</em>. No changes required to the existing five domain tools.</p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<footer>
+  Enterprise Agent Memory -- generated design atlas. Source diagrams live in <code>project_final/docs/diagrams/*.mmd</code>.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "default",
+    securityLevel: "loose",
+    flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: true },
+    sequence: { useMaxWidth: true },
+    er: { useMaxWidth: true }
+  });
+</script>
+</body>
+</html>

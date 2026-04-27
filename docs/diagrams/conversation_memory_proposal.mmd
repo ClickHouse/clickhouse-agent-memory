@@ -1,0 +1,36 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#dae8fc', 'lineColor': '#666'}}}%%
+flowchart LR
+    subgraph SESSION["Current turn"]
+        USER["User message"]
+        AGENT["LLM agent"]
+    end
+
+    USER --> AGENT
+
+    subgraph HOT["HOT (Memory engine)"]
+        AMH[("agent_memory_hot<br/>session_id, turn_id, role,<br/>content, metadata, ts")]
+    end
+
+    subgraph WARM["WARM (MergeTree + HNSW)"]
+        AML[("agent_memory_long<br/>session_id, turn_id, role,<br/>content, content_embedding,<br/>memory_type, importance,<br/>user_id, agent_id, ts")]
+        KB[("knowledge_base<br/>article_id, title, content,<br/>content_embedding, tags")]
+    end
+
+    AGENT -->|"1. INSERT current turn"| AMH
+    AGENT -->|"2. memory_conversation_recall(query, user_id)<br/>cosineDistance over user's past turns"| AML
+    AGENT -->|"3. memory_conversation_remember(fact, user_id)<br/>distilled preference / decision"| AML
+    AGENT -->|"knowledge lookup"| KB
+
+    AMH -.->|"flush + embed every N min<br/>or on session close"| AML
+    AML -.->|"TTL 90d to cold"| COLD[("Cold object storage")]
+
+    TOOLS["Proposed MCP tools<br/>- memory_conversation_recall(user_id, query, k)<br/>- memory_conversation_remember(user_id, fact, kind)<br/>- memory_conversation_window(session_id, n)"]
+
+    AGENT --> TOOLS
+    TOOLS --> AMH
+    TOOLS --> AML
+
+    style SESSION fill:#e1d5e7,stroke:#9673a6
+    style HOT fill:#f8cecc,stroke:#b85450
+    style WARM fill:#dae8fc,stroke:#6c8ebf
+    style TOOLS fill:#fff2cc,stroke:#d6b656

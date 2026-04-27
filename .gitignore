@@ -1,0 +1,20 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.DS_Store
+ch_data/
+pg_data/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Slide decks + blogs — local-only, not committed
+docs/slides/
+docs/blog/
+benchmarks/results/screenshots/

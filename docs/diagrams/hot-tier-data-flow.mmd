@@ -1,0 +1,51 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#f8cecc', 'lineColor': '#b85450'}}}%%
+flowchart TB
+    subgraph SOURCES["Data Sources"]
+        APP["Application Logs<br/>+ Metrics"]
+        NET["Network Telemetry<br/>SNMP / sFlow"]
+        SEC["SIEM / EDR / IAM<br/>Security Events"]
+    end
+
+    subgraph STREAMS["Event Streams -- Memory Engine"]
+        OES["obs_events_stream<br/><i>ts, service, level, message,<br/>latency_ms, error_code</i>"]
+        TNS["telco_network_state<br/><i>ts, element_id, cpu, memory,<br/>status, error_rate</i>"]
+        SES["sec_events_stream<br/><i>ts, event_type, user_id,<br/>asset_id, src_ip, severity</i>"]
+    end
+
+    APP -->|INSERT| OES
+    NET -->|INSERT| TNS
+    SEC -->|INSERT| SES
+
+    AGENT["AI Agent<br/>(CLI Cookbook)"]
+    TOOL["run_select_query<br/>via shared/client.py"]
+
+    AGENT --> TOOL
+
+    TOOL -->|"SELECT * FROM obs_events_stream<br/>WHERE service='svc-payments'<br/>AND level IN ('ERROR','CRITICAL')"| OES
+
+    subgraph WORKSPACES["Investigation Workspaces -- Memory Engine"]
+        OIW["obs_incident_workspace<br/><i>session_id, hypothesis,<br/>evidence, status</i>"]
+        TFW["telco_fault_workspace<br/><i>fault_id, element_id,<br/>metric, value, threshold</i>"]
+        SCW["sec_case_workspace<br/><i>case_id, correlated events<br/>by user, asset, IP</i>"]
+    end
+
+    TOOL -.->|"INSERT hypothesis<br/>+ evidence"| OIW
+
+    subgraph PATTERN["HOT Tier Interaction Pattern"]
+        direction TB
+        S1["1. Agent detects anomaly via SELECT on event stream"]
+        S2["2. Agent creates investigation workspace (INSERT session)"]
+        S3["3. Agent queries correlated events (SELECT with time + service filter)"]
+        S4["4. Agent stores hypothesis and evidence for next steps"]
+        S1 --> S2 --> S3 --> S4
+    end
+
+    NOTE["Characteristics:<br/>- Latency: sub-5ms reads<br/>- Data is volatile (lost on restart)<br/>- Used for current investigation context<br/>- Accessed via direct ClickHouse queries"]
+
+    style SOURCES fill:#f5f5f5,stroke:#999
+    style STREAMS fill:#f8cecc,stroke:#b85450
+    style WORKSPACES fill:#ffe6cc,stroke:#d79b00
+    style AGENT fill:#e1d5e7,stroke:#9673a6
+    style TOOL fill:#fff2cc,stroke:#d6b656
+    style PATTERN fill:#f5f5f5,stroke:#ccc
+    style NOTE fill:#f5f5f5,stroke:#ccc,text-align:left

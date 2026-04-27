@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enterprise Agent Memory - Agent catalogue</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ch-yellow: #FAFF69;
+    --ch-yellow-ink: #1E1E1E;
+    --ch-red: #FC2424;
+    --ch-purple: #8430CE;
+    --ch-blue: #5B8CFF;
+    --ch-bg: #0F0F10;
+    --ch-panel: #17171A;
+    --ch-panel-2: #1F1F24;
+    --ch-border: #2A2A32;
+    --ch-text: #F5F5F7;
+    --ch-muted: #9CA0AD;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+           'Helvetica Neue', Arial, sans-serif;
+    --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace,
+           SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--ch-bg); color: var(--ch-text); }
+  body {
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--ch-yellow); text-decoration: none; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+  header.top {
+    background: var(--ch-bg);
+    border-bottom: 1px solid var(--ch-border);
+    padding: 18px 32px;
+  }
+  header.top .inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  .brand .block-red, .brand .block-yellow {
+    display: inline-block; width: 10px; height: 18px; border-radius: 2px;
+  }
+  .brand .block-red { background: var(--ch-red); }
+  .brand .block-yellow { background: var(--ch-yellow); }
+  .top-links {
+    display: flex; gap: 20px; font-size: 13px;
+  }
+  .top-links a { color: var(--ch-muted); }
+  .top-links a:hover { color: var(--ch-yellow); }
+
+  .hero { padding: 88px 0 40px; }
+  .hero .eyebrow {
+    font-size: 12px; color: var(--ch-yellow);
+    text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-size: 48px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.08; margin-bottom: 20px; max-width: 960px;
+  }
+  .hero .accent { color: var(--ch-yellow); }
+  .hero p.intro {
+    color: var(--ch-muted); font-size: 17px; max-width: 820px;
+  }
+
+  .pitch {
+    padding: 24px 0 48px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  }
+  .pitch .card {
+    background: var(--ch-panel); border: 1px solid var(--ch-border);
+    border-left: 3px solid var(--ch-border);
+    border-radius: 4px; padding: 22px;
+  }
+  .pitch .card.hot   { border-left-color: var(--ch-red); }
+  .pitch .card.warm  { border-left-color: var(--ch-purple); }
+  .pitch .card.graph { border-left-color: var(--ch-yellow); }
+  .pitch .card h3 {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    color: var(--ch-muted); text-transform: uppercase;
+    letter-spacing: 0.12em; margin-bottom: 10px;
+  }
+  .pitch .card p {
+    font-size: 14px; color: var(--ch-text);
+  }
+  .pitch .card p b { color: var(--ch-yellow); font-weight: 600; }
+
+  section.catalogue { padding: 32px 0 64px; }
+  section.catalogue h2 {
+    font-size: 13px; font-weight: 600; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin-bottom: 24px;
+  }
+
+  .agent-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  }
+  article.agent {
+    background: var(--ch-panel); border: 1px solid var(--ch-border);
+    border-top: 3px solid var(--ch-border);
+    border-radius: 4px; padding: 28px; display: flex; flex-direction: column;
+  }
+  article.agent.sre     { border-top-color: var(--ch-red); }
+  article.agent.netops  { border-top-color: var(--ch-purple); }
+  article.agent.soc     { border-top-color: var(--ch-yellow); }
+  article.agent.support { border-top-color: var(--ch-blue); }
+
+  .agent-header {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .agent-title {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.01em;
+  }
+  .agent-chip {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 3px 8px; border-radius: 3px;
+    border: 1px solid var(--ch-border); color: var(--ch-muted);
+  }
+  .agent-desc {
+    color: var(--ch-muted); font-size: 14px; margin-bottom: 20px;
+  }
+  .agent-section-label {
+    font-size: 11px; font-weight: 600; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin: 18px 0 10px;
+  }
+  ol.samples {
+    list-style: none; padding-left: 0; margin: 0 0 20px;
+  }
+  ol.samples li {
+    border-bottom: 1px dashed var(--ch-border);
+    padding: 12px 0;
+    counter-increment: sq;
+    position: relative;
+    padding-left: 36px;
+  }
+  ol.samples li:last-child { border-bottom: 0; }
+  ol.samples li::before {
+    content: counter(sq);
+    position: absolute; left: 0; top: 12px;
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    color: var(--ch-yellow);
+    background: var(--ch-panel-2);
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+  ol.samples { counter-reset: sq; }
+  ol.samples li .intent {
+    display: block; font-weight: 600; color: var(--ch-text);
+    font-size: 14px; margin-bottom: 4px;
+  }
+  ol.samples li code {
+    display: inline-block;
+    font-family: var(--mono); font-size: 13px; color: var(--ch-text);
+    background: var(--ch-panel-2); border: 1px solid var(--ch-border);
+    padding: 4px 10px; border-radius: 3px;
+    word-break: break-word; max-width: 100%;
+  }
+
+  .agent-actions {
+    margin-top: auto; display: flex; gap: 10px; flex-wrap: wrap;
+    padding-top: 18px; border-top: 1px solid var(--ch-border);
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 600;
+    padding: 8px 14px; border-radius: 3px;
+    border: 1px solid var(--ch-border);
+    transition: all 0.15s ease;
+  }
+  .btn.primary {
+    background: var(--ch-yellow); color: var(--ch-yellow-ink);
+    border-color: var(--ch-yellow);
+  }
+  .btn.primary:hover { background: #fff; border-color: #fff; }
+  .btn.secondary {
+    background: transparent; color: var(--ch-text);
+  }
+  .btn.secondary:hover { border-color: var(--ch-yellow); color: var(--ch-yellow); }
+
+  .tools-used {
+    margin-top: 18px; display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .tools-used code {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--ch-muted);
+    background: var(--ch-panel-2); border: 1px solid var(--ch-border);
+    padding: 3px 7px; border-radius: 3px;
+  }
+
+  footer {
+    border-top: 1px solid var(--ch-border);
+    padding: 28px 32px;
+    text-align: center; color: var(--ch-muted); font-size: 12px;
+    font-family: var(--mono);
+  }
+  footer a { color: var(--ch-muted); }
+  footer a:hover { color: var(--ch-yellow); }
+
+  @media (max-width: 900px) {
+    .hero h1 { font-size: 34px; }
+    .pitch { grid-template-columns: 1fr; }
+    .agent-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <div class="brand">
+      <span class="block-red"></span><span class="block-yellow"></span>
+      <span>enterprise_agent_memory / on ClickHouse</span>
+    </div>
+    <nav class="top-links">
+      <a href="index.html">Agents</a>
+      <a href="../designs.html">Architecture</a>
+      <a href="clickhouse-style-guide.md">Style guide</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="page">
+    <div class="eyebrow">Agent catalogue</div>
+    <h1>
+      Four AI agents, <span class="accent">one ClickHouse cluster</span>.
+      Pick an agent, ask a sample question, or open the session report
+      to see exactly how it works.
+    </h1>
+    <p class="intro">
+      Every agent runs on the same three memory tiers (HOT event streams,
+      WARM semantic search, GRAPH relationships) and the same eight MCP
+      tools. What changes is the system prompt and the canonical question
+      shape. Every session generates a precision report you can share with
+      a solution architect or an enterprise buyer.
+    </p>
+  </div>
+</section>
+
+<section class="pitch">
+  <div class="page" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+    <div class="card hot">
+      <h3>HOT tier</h3>
+      <p>Live event streams on the <b>ClickHouse Memory engine</b>. Sub-5ms reads, volatile, perfect for "what is happening right now" questions.</p>
+    </div>
+    <div class="card warm">
+      <h3>WARM tier</h3>
+      <p>Historical records with <b>HNSW vector similarity</b> on MergeTree. 50-500ms, persistent. Answers "have we seen this before" via semantic search.</p>
+    </div>
+    <div class="card graph">
+      <h3>GRAPH tier</h3>
+      <p>Multi-hop traversal via <b>SQL self-JOIN + UNION ALL</b> on MergeTree edge tables. 3-10 ms at 2 hops. Maps blast radius, topology impact, and lateral-movement risk.</p>
+    </div>
+  </div>
+</section>
+
+<section class="catalogue">
+  <div class="page">
+    <h2>Agent presets</h2>
+
+    <div class="agent-grid">
+
+      <!-- AI SRE Agent -->
+      <article class="agent sre">
+        <div class="agent-header">
+          <div class="agent-title">AI SRE Agent</div>
+          <span class="agent-chip">observability</span>
+        </div>
+        <div class="agent-desc">
+          Incident response across HOT live errors, WARM historical
+          incidents via semantic search, and GRAPH service dependencies.
+          Used for the svc-payments walk-through in every enterprise demo.
+        </div>
+
+        <div class="agent-section-label">Sample questions</div>
+        <ol class="samples">
+          <li>
+            <span class="intent">Full incident walk-through (5 tools)</span>
+            <code>svc-payments is failing, walk me through it</code>
+          </li>
+          <li>
+            <span class="intent">Blast radius only (one GRAPH query)</span>
+            <code>what is the blast radius of svc-auth going down?</code>
+          </li>
+          <li>
+            <span class="intent">Find a past pattern (semantic search)</span>
+            <code>find past incidents similar to a DB_TIMEOUT storm</code>
+          </li>
+          <li>
+            <span class="intent">Pull a runbook by id</span>
+            <code>pull the runbook for incident &lt;incident_uuid&gt;</code>
+          </li>
+          <li>
+            <span class="intent">Remember a preference</span>
+            <code>always page me for CRITICAL only, remember that</code>
+          </li>
+        </ol>
+
+        <div class="agent-section-label">Tools this preset binds</div>
+        <div class="tools-used">
+          <code>scan_live_stream</code>
+          <code>open_investigation</code>
+          <code>semantic_search</code>
+          <code>fetch_record</code>
+          <code>graph_traverse</code>
+        </div>
+
+        <div class="agent-actions">
+          <a class="btn primary" href="example-sre-report.html">
+            Open example report
+          </a>
+          <a class="btn secondary" href="http://localhost:13800/" target="_blank" rel="noopener">
+            Try in LibreChat
+          </a>
+        </div>
+      </article>
+
+      <!-- AI NetOps Agent -->
+      <article class="agent netops">
+        <div class="agent-header">
+          <div class="agent-title">AI NetOps Agent</div>
+          <span class="agent-chip">telco</span>
+        </div>
+        <div class="agent-desc">
+          Network fault triage across HOT element state, WARM historical
+          events, and GRAPH physical topology. Answers "is this element
+          degraded" and "who loses service if it fails".
+        </div>
+
+        <div class="agent-section-label">Sample questions</div>
+        <ol class="samples">
+          <li>
+            <span class="intent">Live health scan</span>
+            <code>what network elements are degraded right now?</code>
+          </li>
+          <li>
+            <span class="intent">Full fault investigation (5 tools)</span>
+            <code>core-router-01 is degraded, assess the impact and find a past fix</code>
+          </li>
+          <li>
+            <span class="intent">Topology impact only (one GRAPH query)</span>
+            <code>downstream impact if core-router-01 fails</code>
+          </li>
+          <li>
+            <span class="intent">Past fault pattern (semantic search)</span>
+            <code>find past events like a BGP flap in edge-router-02</code>
+          </li>
+          <li>
+            <span class="intent">Remember a preference</span>
+            <code>I own the NYC core routers, remember that</code>
+          </li>
+        </ol>
+
+        <div class="agent-section-label">Tools this preset binds</div>
+        <div class="tools-used">
+          <code>scan_live_stream</code>
+          <code>open_investigation</code>
+          <code>semantic_search</code>
+          <code>fetch_record</code>
+          <code>graph_traverse</code>
+        </div>
+
+        <div class="agent-actions">
+          <a class="btn primary" href="example-netops-report.html">
+            Open example report
+          </a>
+          <a class="btn secondary" href="http://localhost:13800/" target="_blank" rel="noopener">
+            Try in LibreChat
+          </a>
+        </div>
+      </article>
+
+      <!-- AI SOC Agent -->
+      <article class="agent soc">
+        <div class="agent-header">
+          <div class="agent-title">AI SOC Agent</div>
+          <span class="agent-chip">cybersecurity</span>
+        </div>
+        <div class="agent-desc">
+          Threat triage across HOT security events, WARM threat intel +
+          historical incidents, and GRAPH user-asset access. Handles
+          credential-compromise, lateral-movement, and IoC lookups.
+        </div>
+
+        <div class="agent-section-label">Sample questions</div>
+        <ol class="samples">
+          <li>
+            <span class="intent">Full triage on a user (5 tools)</span>
+            <code>what is happening on user-006 right now, full triage</code>
+          </li>
+          <li>
+            <span class="intent">IoC against threat intel (one WARM query)</span>
+            <code>is 185.220.101.47 known to any threat actor?</code>
+          </li>
+          <li>
+            <span class="intent">Lateral movement only (one GRAPH query)</span>
+            <code>show lateral movement risk from user-004</code>
+          </li>
+          <li>
+            <span class="intent">Past attack pattern (semantic search)</span>
+            <code>find past credential-stuffing incidents on DB admins</code>
+          </li>
+          <li>
+            <span class="intent">Remember a preference</span>
+            <code>I handle cases on PII-class assets only, remember that</code>
+          </li>
+        </ol>
+
+        <div class="agent-section-label">Tools this preset binds</div>
+        <div class="tools-used">
+          <code>scan_live_stream</code>
+          <code>open_investigation</code>
+          <code>semantic_search</code>
+          <code>fetch_record</code>
+          <code>graph_traverse</code>
+        </div>
+
+        <div class="agent-actions">
+          <a class="btn primary" href="example-soc-report.html">
+            Open example report
+          </a>
+          <a class="btn secondary" href="http://localhost:13800/" target="_blank" rel="noopener">
+            Try in LibreChat
+          </a>
+        </div>
+      </article>
+
+      <!-- Support Copilot -->
+      <article class="agent support">
+        <div class="agent-header">
+          <div class="agent-title">Support Copilot</div>
+          <span class="agent-chip">conversational memory</span>
+        </div>
+        <div class="agent-desc">
+          Cross-session continuity. Remembers past chats, recalls the right
+          memory via semantic search, and persists distilled preferences or
+          decisions. The "agent that remembers you" preset.
+        </div>
+
+        <div class="agent-section-label">Sample questions</div>
+        <ol class="samples">
+          <li>
+            <span class="intent">Start a continuity session</span>
+            <code>hi, I am u-maruthi. What do you remember about me?</code>
+          </li>
+          <li>
+            <span class="intent">Recall a past topic (semantic recall)</span>
+            <code>did we ever discuss svc-payments pool sizing?</code>
+          </li>
+          <li>
+            <span class="intent">Persist a new preference</span>
+            <code>I prefer ClickHouse EXPLAIN PIPELINE format, remember that</code>
+          </li>
+          <li>
+            <span class="intent">Replay this session</span>
+            <code>what have we covered in this session so far?</code>
+          </li>
+          <li>
+            <span class="intent">Write a decision</span>
+            <code>we agreed SLO 99.9 for svc-payments checkout, remember that</code>
+          </li>
+        </ol>
+
+        <div class="agent-section-label">Tools this preset binds</div>
+        <div class="tools-used">
+          <code>replay_session</code>
+          <code>recall_memory</code>
+          <code>save_memory</code>
+        </div>
+
+        <div class="agent-actions">
+          <a class="btn primary" href="example-support-report.html">
+            Open example report
+          </a>
+          <a class="btn secondary" href="http://localhost:13800/" target="_blank" rel="noopener">
+            Try in LibreChat
+          </a>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  Enterprise Agent Memory on ClickHouse 26.3 · HNSW vector_similarity · SQL JOINs ·
+  <a href="example-sre-report.html">SRE report</a> ·
+  <a href="example-netops-report.html">NetOps report</a> ·
+  <a href="example-soc-report.html">SOC report</a> ·
+  <a href="example-support-report.html">Support report</a>
+</footer>
+
+</body>
+</html>

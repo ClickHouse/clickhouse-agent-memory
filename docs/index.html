@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Enterprise Agent Memory on ClickHouse</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Three memory tiers. One database. A reference implementation for AI agent memory on ClickHouse." />
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #12161f;
+    --panel-2: #161b26;
+    --border: #1f2633;
+    --text: #e6e8ef;
+    --muted: #8a92a5;
+    --hot: #f08080;
+    --warm: #f2c14e;
+    --graph: #8bd17c;
+    --yellow: #FFCC00;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--text); text-decoration: none; }
+  a:hover { color: var(--yellow); }
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+  section {
+    padding: 88px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  section:last-of-type { border-bottom: none; }
+  h2 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    margin: 0 0 28px;
+  }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--muted); }
+
+  /* top nav bar */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(11, 14, 20, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 0;
+  }
+  .topbar .page {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+  .brand .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--yellow);
+    margin-right: 8px;
+    vertical-align: 1px;
+  }
+  .topnav {
+    display: flex;
+    gap: 24px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .topnav a { color: var(--muted); }
+  .topnav a:hover { color: var(--text); }
+
+  /* hero */
+  .hero {
+    padding: 120px 0 64px;
+    border-bottom: none;
+  }
+  .hero h1 {
+    margin: 0;
+    font-size: 64px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+  .hero h1 .line { display: block; }
+  .hero h1 .accent { color: var(--yellow); }
+  .sub-hero {
+    margin: 28px 0 0;
+    font-size: 19px;
+    color: var(--muted);
+    max-width: 640px;
+  }
+  .ctas {
+    margin-top: 40px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-block;
+    padding: 12px 22px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.08s ease, background 0.15s ease;
+  }
+  .btn.primary {
+    background: var(--yellow);
+    color: #0b0e14;
+  }
+  .btn.primary:hover { background: #ffd633; color: #0b0e14; }
+  .btn.secondary {
+    background: transparent;
+    color: var(--text);
+    border-color: #2b3345;
+  }
+  .btn.secondary:hover { border-color: var(--yellow); color: var(--yellow); }
+
+  /* hero SVG */
+  .hero-visual {
+    padding: 40px 0 96px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-visual .frame {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+  }
+  .hero-visual svg {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+  }
+  .hero-visual .cap {
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* why this exists */
+  .why-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+  .why-col h3 {
+    font-size: 16px;
+    margin: 0 0 20px;
+    color: var(--text);
+  }
+  .stitched {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .stack-pill {
+    width: 200px;
+    padding: 14px 18px;
+    background: #0f1320;
+    border: 1px dashed #2d3648;
+    border-radius: 999px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text);
+    margin: 4px 0;
+  }
+  .stack-connector {
+    width: 2px;
+    height: 16px;
+    border-left: 1px dashed #2d3648;
+  }
+  .unified {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .unified-box {
+    width: 100%;
+    max-width: 340px;
+    padding: 34px 24px;
+    background: #0f1320;
+    border: 1px solid var(--yellow);
+    border-radius: 12px;
+    text-align: center;
+  }
+  .unified-box .title {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--yellow);
+    margin-bottom: 22px;
+    letter-spacing: 0.02em;
+  }
+  .unified-pills {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .tier-pill {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .tier-pill.hot   { background: rgba(240,128,128,0.14); color: var(--hot);   border: 1px solid rgba(240,128,128,0.35); }
+  .tier-pill.warm  { background: rgba(242,193,78,0.14);  color: var(--warm);  border: 1px solid rgba(242,193,78,0.35); }
+  .tier-pill.graph { background: rgba(139,209,124,0.14); color: var(--graph); border: 1px solid rgba(139,209,124,0.35); }
+  .why-foot {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 14px;
+    text-align: center;
+  }
+  .why-caption {
+    margin-top: 30px;
+    font-size: 14px;
+    color: var(--muted);
+    text-align: center;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* narrative arc */
+  .arc {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding: 4px 4px 20px;
+    scrollbar-width: thin;
+  }
+  .arc-card {
+    flex: 0 0 220px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 18px 20px;
+  }
+  .arc-time {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--yellow);
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+  }
+  .arc-beat {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+  .arc-line {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* personas */
+  .personas {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .persona {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .persona-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .persona-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    letter-spacing: -0.005em;
+  }
+  .persona-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--yellow);
+    border: 1px solid rgba(255,204,0,0.4);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .persona-pitch {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: 0 0 14px;
+    line-height: 1.55;
+  }
+  .persona-bullets {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.8;
+    margin-bottom: 18px;
+    flex: 1;
+  }
+  .persona-bullets div { color: #bcc3d4; }
+  .persona-link {
+    font-size: 12.5px;
+    color: var(--yellow);
+    font-family: var(--mono);
+    letter-spacing: 0.02em;
+  }
+  .persona-link:hover { color: #ffd633; }
+
+  /* try it */
+  .code-block {
+    background: #0a0d13;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 28px;
+    font-family: var(--mono);
+    font-size: 14px;
+    color: #d6dae6;
+    line-height: 1.8;
+    overflow-x: auto;
+  }
+  .code-block .comment { color: var(--muted); }
+  .code-block .prompt { color: var(--yellow); margin-right: 10px; }
+  .try-cap {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 16px;
+    max-width: 720px;
+  }
+
+  /* message architecture */
+  .msg-row {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    gap: 24px;
+    align-items: center;
+    padding: 22px 0;
+    border-top: 1px solid var(--border);
+  }
+  .msg-row:last-child { border-bottom: 1px solid var(--border); }
+  .chip {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+  .chip.hot   { background: rgba(240,128,128,0.14); color: var(--hot);   border: 1px solid rgba(240,128,128,0.4); }
+  .chip.warm  { background: rgba(242,193,78,0.14);  color: var(--warm);  border: 1px solid rgba(242,193,78,0.4); }
+  .chip.graph { background: rgba(139,209,124,0.14); color: var(--graph); border: 1px solid rgba(139,209,124,0.4); }
+  .msg-claim { font-size: 18px; font-weight: 600; color: var(--text); }
+  .msg-anti  { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+
+  /* wedge essay */
+  .wedge {
+    max-width: 760px;
+  }
+  .wedge .claim {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.45;
+    padding: 24px 28px;
+    background: var(--panel);
+    border-left: 3px solid var(--yellow);
+    border-radius: 4px;
+    margin: 0 0 32px;
+  }
+  .wedge p {
+    font-size: 16px;
+    color: #c6ccda;
+    margin: 0 0 18px;
+    line-height: 1.7;
+  }
+  .wedge .close {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--yellow);
+    margin-top: 24px;
+  }
+
+  /* links */
+  .links h2 { margin-bottom: 20px; }
+  .links ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .links li {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+    font-size: 15px;
+  }
+  .links li:last-child { border-bottom: 1px solid var(--border); }
+  .links li a {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    color: var(--text);
+  }
+  .links li a:hover .arrow { color: var(--yellow); }
+  .links .arrow {
+    font-family: var(--mono);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .links .path {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* footer */
+  footer {
+    padding: 36px 0 56px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-family: var(--mono);
+    letter-spacing: 0.02em;
+  }
+
+  /* responsive */
+  @media (max-width: 1080px) {
+    .personas { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 900px) {
+    .hero h1 { font-size: 48px; }
+    .why-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 720px) {
+    .hero { padding: 80px 0 48px; }
+    .hero h1 { font-size: 38px; }
+    section { padding: 64px 0; }
+    .personas { grid-template-columns: 1fr; }
+    .msg-row {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .topnav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- top bar -->
+<div class="topbar">
+  <div class="page">
+    <div class="brand"><span class="dot"></span>Enterprise Agent Memory</div>
+    <div class="topnav">
+      <a href="#why">Why</a>
+      <a href="#personas">Personas</a>
+      <a href="#run">Run</a>
+      <a href="#wedge">The wedge</a>
+      <a href="designs.html">Atlas</a>
+    </div>
+  </div>
+</div>
+
+<!-- hero -->
+<section class="hero">
+  <div class="page">
+    <h1>
+      <span class="line">Agent memory is filtered retrieval,</span>
+      <span class="line">not vector search.</span>
+      <span class="line accent">That is ClickHouse.</span>
+    </h1>
+    <p class="sub-hero">Three memory tiers. One database. Built for AI agents.</p>
+    <div class="ctas">
+      <a class="btn primary" href="#run">Run the demo</a>
+      <a class="btn secondary" href="designs.html">Read the architecture</a>
+    </div>
+  </div>
+</section>
+
+<!-- hero visual -->
+<section class="hero-visual">
+  <div class="page">
+    <div class="frame">
+      <svg viewBox="0 0 1000 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AI agent calls MCP tools against three ClickHouse memory tiers">
+        <defs>
+          <style>
+            .box-fill { fill: #12161f; stroke: #2b3345; stroke-width: 1; }
+            .box-label { fill: #e6e8ef; font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; font-weight: 600; }
+            .box-sub { fill: #8a92a5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+            .tier-label { fill: #0b0e14; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+            .tier-detail { fill: #0b0e14; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+            .ch-label { fill: #0b0e14; font-family: 'Inter', -apple-system, sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.02em; }
+            .connector { stroke: #3a4558; stroke-width: 1.2; fill: none; }
+            .connector-ch { stroke: #FFCC00; stroke-width: 1.4; fill: none; }
+            .mcp-text { fill: #e6e8ef; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
+            .mcp-text-dim { fill: #8a92a5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+          </style>
+        </defs>
+
+        <!-- Left: AI Agent -->
+        <rect class="box-fill" x="30" y="90" width="180" height="150" rx="10" ry="10"/>
+        <text class="box-label" x="120" y="118" text-anchor="middle">AI Agent</text>
+        <line x1="60" y1="132" x2="180" y2="132" stroke="#2b3345" stroke-width="1"/>
+        <text class="box-sub" x="120" y="154" text-anchor="middle">Gemini</text>
+        <text class="box-sub" x="120" y="172" text-anchor="middle">OpenAI</text>
+        <text class="box-sub" x="120" y="190" text-anchor="middle">Anthropic</text>
+        <text class="box-sub" x="120" y="208" text-anchor="middle">Ollama</text>
+
+        <!-- Middle: MCP Tools -->
+        <rect class="box-fill" x="270" y="60" width="290" height="230" rx="10" ry="10"/>
+        <text class="box-label" x="415" y="88" text-anchor="middle">MCP Tools</text>
+        <line x1="290" y1="102" x2="540" y2="102" stroke="#2b3345" stroke-width="1"/>
+        <text class="mcp-text" x="290" y="124">memory_hot_scan</text>
+        <text class="mcp-text" x="290" y="144">memory_hot_workspace</text>
+        <text class="mcp-text" x="290" y="164">memory_warm_search</text>
+        <text class="mcp-text" x="290" y="184">memory_warm_lookup</text>
+        <text class="mcp-text" x="290" y="204">memory_graph_traverse</text>
+        <line x1="290" y1="218" x2="540" y2="218" stroke="#2b3345" stroke-width="1" stroke-dasharray="3,3"/>
+        <text class="mcp-text-dim" x="290" y="238">+ conversation memory</text>
+        <text class="mcp-text-dim" x="290" y="256">  window / recall / remember</text>
+
+        <!-- Connector: agent -> MCP -->
+        <path class="connector" d="M 210 165 L 270 175"/>
+
+        <!-- Right: three tier bars -->
+        <!-- HOT -->
+        <rect x="620" y="60" width="340" height="60" rx="8" ry="8" fill="#f08080"/>
+        <text class="tier-label" x="640" y="88">HOT</text>
+        <text class="tier-detail" x="640" y="106">Memory engine  .  sub-5ms  .  live streams + workspaces</text>
+
+        <!-- WARM -->
+        <rect x="620" y="140" width="340" height="60" rx="8" ry="8" fill="#f2c14e"/>
+        <text class="tier-label" x="640" y="168">WARM</text>
+        <text class="tier-detail" x="640" y="186">MergeTree + HNSW  .  10-50ms  .  vector similarity</text>
+
+        <!-- GRAPH -->
+        <rect x="620" y="220" width="340" height="60" rx="8" ry="8" fill="#8bd17c"/>
+        <text class="tier-label" x="640" y="248">GRAPH</text>
+        <text class="tier-detail" x="640" y="266">SQL JOINs on MergeTree  .  3-10ms at 2 hops  .  relationships</text>
+
+        <!-- Connectors: MCP -> tier bars -->
+        <path class="connector" d="M 560 120 L 620 90"/>
+        <path class="connector" d="M 560 175 L 620 170"/>
+        <path class="connector" d="M 560 230 L 620 250"/>
+
+        <!-- Converging lines from three bars down to the ClickHouse node -->
+        <path class="connector-ch" d="M 700 120 L 700 360"/>
+        <path class="connector-ch" d="M 790 200 L 790 360"/>
+        <path class="connector-ch" d="M 880 280 L 880 360"/>
+
+        <!-- ClickHouse cylinder -->
+        <rect x="600" y="360" width="380" height="70" rx="12" ry="12" fill="#FFCC00" stroke="#e6b800" stroke-width="1"/>
+        <text class="ch-label" x="790" y="402" text-anchor="middle">ClickHouse</text>
+
+        <!-- subtle label under the node -->
+        <text class="mcp-text-dim" x="790" y="450" text-anchor="middle">one cluster, one SQL surface</text>
+
+      </svg>
+      <div class="cap">Agent calls five MCP tools. Each tool is a single SQL query against one ClickHouse cluster.</div>
+    </div>
+  </div>
+</section>
+
+<!-- why this exists -->
+<section id="why">
+  <div class="page">
+    <h2>Why this exists</h2>
+    <div class="why-grid">
+      <div class="why-col">
+        <h3>Most AI agents today.</h3>
+        <div class="stitched">
+          <div class="stack-pill">Pinecone</div>
+          <div class="stack-connector"></div>
+          <div class="stack-pill">Redis</div>
+          <div class="stack-connector"></div>
+          <div class="stack-pill">Neo4j</div>
+          <div class="stack-connector"></div>
+          <div class="stack-pill">Postgres</div>
+        </div>
+        <div class="why-foot">Four services. Four APIs. No cross-tier transactions.</div>
+      </div>
+      <div class="why-col">
+        <h3>With ClickHouse.</h3>
+        <div class="unified">
+          <div class="unified-box">
+            <div class="title">ClickHouse</div>
+            <div class="unified-pills">
+              <span class="tier-pill hot">HOT</span>
+              <span class="tier-pill warm">WARM</span>
+              <span class="tier-pill graph">GRAPH</span>
+            </div>
+          </div>
+        </div>
+        <div class="why-foot">One database. One SQL API. One ops surface.</div>
+      </div>
+    </div>
+    <div class="why-caption">Same retrieval. Far less glue code. Written in the database you already know how to scale.</div>
+  </div>
+</section>
+
+<!-- narrative arc -->
+<section>
+  <div class="page">
+    <h2>Narrative arc</h2>
+    <div class="arc">
+      <div class="arc-card">
+        <div class="arc-time">[0:00]  Land</div>
+        <div class="arc-beat">The wedge.</div>
+        <div class="arc-line">One sentence hits and the three-tier idea is in the room.</div>
+      </div>
+      <div class="arc-card">
+        <div class="arc-time">[0:30]  Try</div>
+        <div class="arc-beat">One command.</div>
+        <div class="arc-line">Stack comes up locally. No SaaS signup, no account.</div>
+      </div>
+      <div class="arc-card">
+        <div class="arc-time">[1:00]  Feel</div>
+        <div class="arc-beat">HOT / WARM / GRAPH.</div>
+        <div class="arc-line">Agent tools flash tier and latency inside LibreChat.</div>
+      </div>
+      <div class="arc-card">
+        <div class="arc-time">[2:00]  Get</div>
+        <div class="arc-beat">Three tiers, one cluster.</div>
+        <div class="arc-line">Architecture page makes the pattern concrete.</div>
+      </div>
+      <div class="arc-card">
+        <div class="arc-time">[5:00]  Compare</div>
+        <div class="arc-beat">Side by side.</div>
+        <div class="arc-line">Stitched stack code next to the single-SQL equivalent.</div>
+      </div>
+      <div class="arc-card">
+        <div class="arc-time">[8:00]  Deep</div>
+        <div class="arc-beat">Walk a cookbook.</div>
+        <div class="arc-line">Read the SQL. See the timings. Understand the shape.</div>
+      </div>
+      <div class="arc-card">
+        <div class="arc-time">[12:00]  Prove</div>
+        <div class="arc-beat">10M conversation turns.</div>
+        <div class="arc-line">Numbers on the reference workload. No estimates.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- personas -->
+<section id="personas">
+  <div class="page">
+    <h2>Four reference agents</h2>
+    <div class="personas">
+      <div class="persona">
+        <div class="persona-head">
+          <div class="persona-title">AI SRE Agent</div>
+        </div>
+        <p class="persona-pitch">Find the failing service, its blast radius, and the runbook from the last time this broke.</p>
+        <div class="persona-bullets">
+          <div>- HOT log stream</div>
+          <div>- WARM vector on past incidents</div>
+          <div>- GRAPH service dependencies</div>
+        </div>
+        <a class="persona-link" href="../cookbooks/observability/">walk the cookbook ..</a>
+      </div>
+
+      <div class="persona">
+        <div class="persona-head">
+          <div class="persona-title">AI NetOps Agent</div>
+        </div>
+        <p class="persona-pitch">Triage the network element, trace topology impact, correlate with historical events.</p>
+        <div class="persona-bullets">
+          <div>- HOT element state</div>
+          <div>- WARM vector on network events</div>
+          <div>- GRAPH physical topology</div>
+        </div>
+        <a class="persona-link" href="../cookbooks/telco/">walk the cookbook ..</a>
+      </div>
+
+      <div class="persona">
+        <div class="persona-head">
+          <div class="persona-title">AI SOC Agent</div>
+        </div>
+        <p class="persona-pitch">Triage the security event, enrich with threat intel, walk the user-asset graph.</p>
+        <div class="persona-bullets">
+          <div>- HOT security events</div>
+          <div>- WARM threat intel + incidents</div>
+          <div>- GRAPH user / asset / access</div>
+        </div>
+        <a class="persona-link" href="../cookbooks/cybersecurity/">walk the cookbook ..</a>
+      </div>
+
+      <div class="persona">
+        <div class="persona-head">
+          <div class="persona-title">Support Copilot</div>
+          <div class="persona-tag">NEW</div>
+        </div>
+        <p class="persona-pitch">Remember what the user asked last week. Recall the right past conversation. Persist distilled preferences.</p>
+        <div class="persona-bullets">
+          <div>- HOT conversation window</div>
+          <div>- WARM vector recall across sessions</div>
+          <div>- Remember preferences</div>
+        </div>
+        <a class="persona-link" href="../librechat/">walk the cookbook ..</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- try it -->
+<section id="run">
+  <div class="page">
+    <h2>Try it</h2>
+    <div class="code-block">
+<span class="prompt">$</span>git clone &lt;this repo&gt;<br/>
+<span class="prompt">$</span>cd enterprise_agent_memory/project_final<br/>
+<span class="prompt">$</span>make setup        <span class="comment"># writes .env files</span><br/>
+<span class="prompt">$</span>make all-up       <span class="comment"># network + cookbooks + seed + LibreChat</span><br/>
+<span class="prompt">$</span><span class="comment"># open http://localhost:3080</span>
+    </div>
+    <div class="try-cap">Requires Docker. ClickHouse, the memory MCP server, and LibreChat all come up together. No account, no SaaS signup.</div>
+  </div>
+</section>
+
+<!-- message architecture -->
+<section>
+  <div class="page">
+    <h2>Message architecture</h2>
+    <div class="msg-row">
+      <div><span class="chip hot">HOT</span></div>
+      <div class="msg-claim">Session state at sub-millisecond latency.</div>
+      <div class="msg-anti">No Redis.</div>
+    </div>
+    <div class="msg-row">
+      <div><span class="chip warm">WARM</span></div>
+      <div class="msg-claim">Historical context via vector similarity.</div>
+      <div class="msg-anti">No Pinecone.</div>
+    </div>
+    <div class="msg-row">
+      <div><span class="chip graph">GRAPH</span></div>
+      <div class="msg-claim">Relationships without ETL.</div>
+      <div class="msg-anti">No Neo4j.</div>
+    </div>
+  </div>
+</section>
+
+<!-- wedge -->
+<section id="wedge">
+  <div class="page">
+    <h2>The wedge</h2>
+    <div class="wedge">
+      <blockquote class="claim">
+        Vector databases are optimized for unfiltered ANN at high recall. Agent memory retrieval is not that workload.
+      </blockquote>
+      <p>
+        Agents filter before they rank. They look up past turns for this user, in the last N days, matching this topic vector, ordered by recency, bounded by session. That shape is filter-heavy, time-series-shaped, with a vector-ranking step at the end.
+      </p>
+      <p>
+        Columnar storage with HNSW handles that shape naturally. Structured indexes cut the candidate set first. Vector similarity ranks the pre-filtered slice. Graph joins expand relationships off the same tables. That is a ClickHouse workload.
+      </p>
+      <div class="close">The wedge is workload shape, not feature count.</div>
+    </div>
+  </div>
+</section>
+
+<!-- links -->
+<section class="links">
+  <div class="page">
+    <h2>Dive deeper</h2>
+    <ul>
+      <li><a href="designs.html"><span>Architecture atlas</span><span class="path">designs.html <span class="arrow">..</span></span></a></li>
+      <li><a href="ARCHITECTURE.md"><span>Full ARCHITECTURE.md</span><span class="path">docs/ARCHITECTURE.md <span class="arrow">..</span></span></a></li>
+      <li><a href="../librechat/README.md"><span>LibreChat demo README</span><span class="path">librechat/README.md <span class="arrow">..</span></span></a></li>
+      <li><a href="../cookbooks/README.md"><span>CLI cookbook README</span><span class="path">cookbooks/README.md <span class="arrow">..</span></span></a></li>
+      <li><a href="../comparison/README.md"><span>Stitched-stack comparison</span><span class="path">comparison/README.md <span class="arrow">..</span></span></a></li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  Enterprise Agent Memory. A reference implementation. Open source.
+</footer>
+
+</body>
+</html>

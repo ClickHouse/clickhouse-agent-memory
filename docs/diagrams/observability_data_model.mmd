@@ -1,0 +1,55 @@
+erDiagram
+    obs_events_stream ||--o{ obs_incident_workspace : "loads into"
+    obs_historical_incidents }o--o{ obs_services : "references"
+    obs_services ||--o{ obs_dependencies : "defines"
+
+    obs_events_stream {
+        UUID event_id
+        DateTime64 ts
+        String service
+        String host
+        Enum level
+        String message
+        String trace_id
+        Float32 latency_ms
+        String error_code
+    }
+
+    obs_incident_workspace {
+        String incident_id
+        UUID event_id
+        DateTime64 ts
+        String service
+        String level
+        String message
+        Float32 latency_ms
+    }
+
+    obs_historical_incidents {
+        UUID incident_id
+        DateTime64 ts
+        String title
+        String description
+        Array affected_services
+        String root_cause
+        String resolution
+        Enum severity
+        UInt32 duration_min
+        Array embedding
+    }
+
+    obs_services {
+        String service_id
+        String name
+        String team
+        String language
+        Enum criticality
+        String region
+    }
+
+    obs_dependencies {
+        String from_service
+        String to_service
+        String dep_type
+        Float32 latency_p99
+    }

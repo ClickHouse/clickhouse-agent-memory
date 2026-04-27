@@ -1,0 +1,60 @@
+erDiagram
+    telco_network_state }o--o{ telco_elements : "tracks state of"
+    telco_network_state ||--o{ telco_fault_workspace : "loads into"
+    telco_elements ||--o{ telco_connections : "connects via"
+    telco_network_events }o--o{ telco_elements : "references"
+
+    telco_network_state {
+        String element_id
+        Enum element_type
+        String vendor
+        String region
+        Enum status
+        Float32 cpu_pct
+        Float32 mem_pct
+        Float32 traffic_gbps
+        Float32 error_rate
+        DateTime64 last_seen
+    }
+
+    telco_fault_workspace {
+        String fault_id
+        String element_id
+        DateTime64 ts
+        String metric
+        Float32 value
+        Float32 threshold
+        String severity
+    }
+
+    telco_network_events {
+        UUID event_id
+        DateTime64 ts
+        String element_id
+        String event_type
+        String description
+        String root_cause
+        String resolution
+        Float32 impact_score
+        UInt32 customers_aff
+        Array embedding
+    }
+
+    telco_elements {
+        String element_id
+        String element_type
+        String vendor
+        String model
+        String region
+        String site
+        Date install_date
+        String criticality
+    }
+
+    telco_connections {
+        String from_element
+        String to_element
+        String link_type
+        Float32 capacity_gbps
+        Float32 latency_ms
+    }

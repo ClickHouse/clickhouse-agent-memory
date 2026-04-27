@@ -1,0 +1,65 @@
+# Stitched stack -- what the "modern AI stack" blog posts tell you to run.
+#
+# Four containers, approximately 3GB of RAM, four health checks, four backup
+# strategies, four upgrade cadences, four sets of client libraries to pin.
+#
+# Compare with the ClickHouse side, which is ONE container already running
+# from cookbooks/docker-compose.yml and covers all four memory tiers.
+#
+# Pinecone has no free OSS image, so we use Weaviate as a stand-in vector
+# database; the structural point (a separate service with a separate API)
+# holds either way.
+#
+# Usage:
+#   docker compose -f comparison/stitched/docker-compose.yml up -d
+#   export REDIS_URL=redis://localhost:6380/0
+#   export NEO4J_URI=bolt://localhost:7688
+#   export NEO4J_PASSWORD=stitched
+#   export POSTGRES_DSN=postgresql://postgres:stitched@localhost:5433/obs
+#   python comparison/stitched/agent.py
+
+version: "3.9"
+
+services:
+  # HOT tier: live events + workspace
+  stitched-redis:
+    image: redis:7-alpine
+    container_name: stitched-redis
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  # WARM tier: vector search (Pinecone stand-in)
+  stitched-weaviate:
+    image: semitechnologies/weaviate:1.24.10
+    container_name: stitched-weaviate
+    ports:
+      - "8090:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      CLUSTER_HOSTNAME: "node1"
+
+  # GRAPH tier: dependency traversal
+  stitched-neo4j:
+    image: neo4j:5.18-community
+    container_name: stitched-neo4j
+    ports:
+      - "7475:7474"
+      - "7688:7687"
+    environment:
+      NEO4J_AUTH: "neo4j/stitched"
+      NEO4J_PLUGINS: '["apoc"]'
+
+  # Relational tier: service catalog + runbooks
+  stitched-postgres:
+    image: postgres:16-alpine
+    container_name: stitched-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: stitched
+      POSTGRES_DB: obs

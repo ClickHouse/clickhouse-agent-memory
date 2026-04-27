@@ -1,0 +1,68 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#dae8fc', 'lineColor': '#6c8ebf'}}}%%
+flowchart TB
+    subgraph INGEST["Data Ingestion"]
+        RAW["Raw Historical Data<br/>(incidents, events, threat intel)"]
+        EMB["Embedding Generation<br/><i>embed(text) -> Array(Float32)</i>"]
+        PROV["Gemini / OpenAI / Ollama / vLLM<br/><i>or deterministic fallback</i>"]
+
+        RAW --> EMB
+        EMB -.-> PROV
+    end
+
+    subgraph STORAGE["WARM Tier Storage -- MergeTree + Embeddings"]
+        OHI[("obs_historical_incidents<br/><i>incident_id, ts, title, description,<br/>root_cause, resolution, severity,<br/>duration_min, embedding</i>")]
+        TNE[("telco_network_events<br/><i>event_id, ts, element_id, event_type,<br/>root_cause, resolution,<br/>impact_score, customers_aff, embedding</i>")]
+        SHI[("sec_historical_incidents<br/><i>incident_id, ts, title, threat_actor,<br/>ttps, root_cause, response,<br/>outcome, severity, embedding</i>")]
+        STI[("sec_threat_intel<br/><i>indicator_id, indicator_type, indicator_val,<br/>threat_actor, campaign, ttps,<br/>confidence, description, embedding</i>")]
+    end
+
+    EMB -->|"INSERT with<br/>embedding column"| OHI
+
+    AGENT["AI Agent<br/>(CLI Cookbook)"]
+
+    subgraph SIMPLE["Simple Path -- semantic_search()"]
+        SS["semantic_search<br/>(domain, query, top_k)"]
+        SS_EMB["embed(query)<br/>internally"]
+        SS_COS["cosineDistance(embedding, [...])"]
+
+        SS --> SS_EMB --> SS_COS
+    end
+
+    subgraph ADVANCED["Advanced Path -- Two-Step"]
+        GEN["generate_embedding(text)"]
+        VS["vector_search<br/>(db, table, embedding,<br/>columns, top_k, filter)"]
+        VS_COS["cosineDistance with<br/>custom WHERE filter"]
+
+        GEN -->|"returns embedding"| VS --> VS_COS
+    end
+
+    AGENT --> SS
+    AGENT --> GEN
+
+    SS_COS --> RESULTS
+    VS_COS --> RESULTS
+
+    RESULTS["Ranked Results<br/>(by cosine distance ASC)"]
+
+    SS_COS -.-> SHI
+    VS_COS -.-> STI
+
+    subgraph PATTERN["WARM Tier Interaction Pattern"]
+        direction TB
+        W1["1. Agent identifies need for historical context from HOT tier"]
+        W2["2. Calls semantic_search('observability', 'payment timeout errors', 3)"]
+        W3["3. Tool embeds query text, runs cosineDistance, returns top 3 matches"]
+        W4["4. Agent uses past root causes and resolutions to inform diagnosis"]
+        W1 --> W2 --> W3 --> W4
+    end
+
+    NOTE["Characteristics:<br/>- Latency: 50-500ms<br/>- Persistent across restarts<br/>- 768-dim embeddings (configurable)<br/>- cosineDistance for similarity ranking"]
+
+    style INGEST fill:#f5f5f5,stroke:#999
+    style STORAGE fill:#dae8fc,stroke:#6c8ebf
+    style SIMPLE fill:#e1d5e7,stroke:#9673a6
+    style ADVANCED fill:#d5e8d4,stroke:#82b366
+    style AGENT fill:#e1d5e7,stroke:#9673a6
+    style RESULTS fill:#fff2cc,stroke:#d6b656
+    style PATTERN fill:#f5f5f5,stroke:#ccc
+    style NOTE fill:#f5f5f5,stroke:#ccc,text-align:left

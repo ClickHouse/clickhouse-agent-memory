@@ -1,0 +1,186 @@
+{
+  "agent_preset": "support-copilot",
+  "agent_label": "Support Copilot (Conversational Memory)",
+  "user_id": "u-maruthi",
+  "question": "hi, I am u-maruthi. What do you remember, and remember my EXPLAIN PIPELINE preference.",
+  "started_at": "2026-04-19T11:05:09+00:00",
+  "brute_force_baseline_bytes": 800000000,
+  "brute_force_baseline_latency_s": 15,
+  "steps": [
+    {
+      "operation_label": "Semantic recall",
+      "reasoning": "Picked recall_memory because the user asked for continuity with 'u-maruthi'. agent_memory_long is the WARM store of every past turn + distilled fact for this user; HNSW cosineDistance ranks by semantic similarity to the query.",
+      "insight_text": "4 past turn(s) / fact(s) found. Top content: Yeah this is the mass key-fetch pattern we hit before. What did we do last time?.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "conversation",
+        "operation": "recall_memory",
+        "latency_ms": 7.79,
+        "row_count": 4,
+        "insights": {
+          "user_id": "u-maruthi",
+          "query_text": "what have we discussed before",
+          "k": 5,
+          "matches": 4,
+          "top_memory_type": "episodic",
+          "top_similarity_distance": 0.3519,
+          "top_content": "Yeah this is the mass key-fetch pattern we hit before. What did we do last time?"
+        },
+        "precision": {
+          "filters_applied": [
+            "user_id = u-maruthi",
+            "ORDER BY cosineDistance(content_embedding, query_vec) ASC",
+            "LIMIT 5"
+          ],
+          "index_hint": "HNSW vector_similarity on `content_embedding`, scoped by user_id prefix",
+          "embedding_dim": 768,
+          "rows_read": 195,
+          "bytes_read": 28488,
+          "rows_returned": 4,
+          "selectivity": "2.05%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "memory_id": "a9b5d966-ffda-4c89-b514-abd31ee3441d",
+            "session_id": "sess-202",
+            "turn_id": 5,
+            "role": "user",
+            "content": "Yeah this is the mass key-fetch pattern we hit before. What did we do last time?",
+            "memory_type": "episodic",
+            "importance": 0.4000000059604645,
+            "ts": "2026-04-08T11:06:00.250000",
+            "similarity_distance": 0.3519
+          },
+          {
+            "memory_id": "6a1d7df5-33b6-4c35-83cb-f06a455c99af",
+            "session_id": "sess-103",
+            "turn_id": 5,
+            "role": "user",
+            "content": "Yeah this is the mass key-fetch pattern we hit before. What did we do last time?",
+            "memory_type": "episodic",
+            "importance": 0.4000000059604645,
+            "ts": "2026-03-29T11:06:00.250000",
+            "similarity_distance": 0.3519
+          },
+          {
+            "memory_id": "a6d5e83c-c674-45ce-9ed8-ec576b244a51",
+            "session_id": "sess-001",
+            "turn_id": 5,
+            "role": "user",
+            "content": "Can you confirm with the historical incidents? I do not want to just copy a runbook blindly.",
+            "memory_type": "episodic",
+            "importance": 0.4000000059604645,
+            "ts": "2026-03-22T11:06:00.250000",
+            "similarity_distance": 0.3646
+          }
+        ],
+        "sql": "-- WARM tier: SEMANTIC RECALL across every past session for this user.\n    -- agent_memory_long is MergeTree + HNSW on content_embedding, so the\n    -- ORDER BY cosineDistance LIMIT k is handled by the vector index.\n    -- cosineDistance: 0 = identical, 2 = opposite. Lower = more similar.\n    SELECT memory_id, session_id, turn_id, role, content,\n           memory_type, importance, ts,\n           -- Rounded copy for display; the un-rounded form drives the sort.\n           round(cosineDistance(content_embedding, [<query embedding vector>]), 4) AS similarity_distance\n    FROM enterprise_memory.agent_memory_long\n    -- Scope to the calling user's memory only.\n    WHERE user_id = {user_id:String}\n    -- ORDER BY uses the un-rounded distance so HNSW kicks in.\n    ORDER BY cosineDistance(content_embedding, [<query embedding vector>]) ASC\n    LIMIT {k:UInt32}"
+      }
+    },
+    {
+      "operation_label": "Save to memory",
+      "reasoning": "Picked save_memory because the user stated a preference. We embed the distilled sentence, tag memory_type='semantic' with importance 0.9, and write a single MergeTree row so future sessions can recall it.",
+      "insight_text": "Persisted: \"user prefers ClickHouse EXPLAIN PIPELINE format for query plans\" as semantic memory with importance 0.9. Will surface in any future recall for this user.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "conversation",
+        "operation": "save_memory",
+        "latency_ms": 839.23,
+        "row_count": 1,
+        "insights": {
+          "user_id": "u-maruthi",
+          "agent_id": "support-copilot",
+          "session_id": null,
+          "memory_type": "semantic",
+          "importance": 0.9,
+          "content_preview": "user prefers ClickHouse EXPLAIN PIPELINE format for query plans",
+          "persisted": true
+        },
+        "precision": {
+          "filters_applied": [
+            "user_id=u-maruthi",
+            "memory_type=semantic",
+            "importance=0.9"
+          ],
+          "index_hint": "MergeTree INSERT (partitioned by toYYYYMM(ts))",
+          "embedding_dim": 768,
+          "rows_read": null,
+          "bytes_read": null,
+          "rows_returned": 1,
+          "selectivity": "n/a (write or non-SELECT)",
+          "written_rows": 1
+        },
+        "rows_preview": [
+          {
+            "user_id": "u-maruthi",
+            "agent_id": "support-copilot",
+            "session_id": "",
+            "memory_type": "semantic",
+            "importance": 0.9,
+            "content": "user prefers ClickHouse EXPLAIN PIPELINE format for query plans"
+          }
+        ],
+        "sql": "-- WARM tier: persist a distilled fact to long-term memory.\n-- The embed() call happens first; the vector is stored alongside\n-- the content so future recalls can rank by cosineDistance.\nINSERT INTO enterprise_memory.agent_memory_long\n    (user_id, agent_id, session_id, turn_id, role, content,\n     content_embedding, memory_type, importance)\nVALUES\n    ({user_id}, {agent_id}, {session_id}, 0, 'assistant', {fact},\n     [<embedding vector>], {kind}, {importance})"
+      }
+    },
+    {
+      "operation_label": "Semantic recall (verify)",
+      "reasoning": "Picked recall_memory a second time to close the loop: we just wrote a fact, we now verify it is retrievable via vector ranking. This proves the memory round-trip works, not just the write.",
+      "insight_text": "Verified. Top match: \"user prefers ClickHouse EXPLAIN PIPELINE format for query plans\" at cosineDistance 0.2259.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "conversation",
+        "operation": "recall_memory",
+        "latency_ms": 30.41,
+        "row_count": 1,
+        "insights": {
+          "user_id": "u-maruthi",
+          "query_text": "EXPLAIN PIPELINE preference",
+          "k": 3,
+          "matches": 1,
+          "top_memory_type": "semantic",
+          "top_similarity_distance": 0.2259,
+          "top_content": "user prefers ClickHouse EXPLAIN PIPELINE format for query plans"
+        },
+        "precision": {
+          "filters_applied": [
+            "user_id = u-maruthi",
+            "ORDER BY cosineDistance(content_embedding, query_vec) ASC",
+            "LIMIT 3"
+          ],
+          "index_hint": "HNSW vector_similarity on `content_embedding`, scoped by user_id prefix",
+          "embedding_dim": 768,
+          "rows_read": 196,
+          "bytes_read": 28645,
+          "rows_returned": 1,
+          "selectivity": "0.51%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "memory_id": "831dd7c2-b3f8-41ad-85e5-0988d859842b",
+            "session_id": "",
+            "turn_id": 0,
+            "role": "assistant",
+            "content": "user prefers ClickHouse EXPLAIN PIPELINE format for query plans",
+            "memory_type": "semantic",
+            "importance": 0.8999999761581421,
+            "ts": "2026-04-19T11:05:08.961000",
+            "similarity_distance": 0.2259
+          }
+        ],
+        "sql": "-- WARM tier: SEMANTIC RECALL across every past session for this user.\n    -- agent_memory_long is MergeTree + HNSW on content_embedding, so the\n    -- ORDER BY cosineDistance LIMIT k is handled by the vector index.\n    -- cosineDistance: 0 = identical, 2 = opposite. Lower = more similar.\n    SELECT memory_id, session_id, turn_id, role, content,\n           memory_type, importance, ts,\n           -- Rounded copy for display; the un-rounded form drives the sort.\n           round(cosineDistance(content_embedding, [<query embedding vector>]), 4) AS similarity_distance\n    FROM enterprise_memory.agent_memory_long\n    -- Scope to the calling user's memory only.\n    WHERE user_id = {user_id:String}\n    -- ORDER BY uses the un-rounded distance so HNSW kicks in.\n    ORDER BY cosineDistance(content_embedding, [<query embedding vector>]) ASC\n    LIMIT {k:UInt32}"
+      }
+    }
+  ],
+  "final_brief": {
+    "fields": {
+      "User": "u-maruthi",
+      "Prior memory loaded": "4 past turn(s) matched",
+      "New fact persisted": "user prefers ClickHouse EXPLAIN PIPELINE format for query plans",
+      "Round-trip verified": "yes"
+    },
+    "recommended": "Call recall_memory at the start of every new turn for this user so the agent appears continuous. Use save_memory whenever the user states a preference or decision. The WARM tier survives container restarts; HOT session scratch does not."
+  }
+}

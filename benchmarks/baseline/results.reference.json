@@ -1,0 +1,192 @@
+{
+  "version": "26.3.9.8",
+  "ch_http": "http://localhost:18123",
+  "database": "enterprise_memory",
+  "iterations": 50,
+  "warmup": 5,
+  "seed_row_counts": {
+    "agent_memory_long": 307,
+    "obs_events_stream": 200,
+    "agent_memory_hot": 185,
+    "obs_incident_workspace": 181,
+    "knowledge_base": 30,
+    "sec_access": 12,
+    "telco_elements": 12,
+    "telco_network_state": 12,
+    "obs_dependencies": 11,
+    "telco_connections": 11,
+    "obs_services": 10,
+    "obs_historical_incidents": 8,
+    "sec_assets": 8,
+    "sec_events_stream": 8,
+    "sec_users": 8,
+    "telco_network_events": 7,
+    "sec_historical_incidents": 5,
+    "sec_threat_intel": 5,
+    "benchmark_writes": 0,
+    "sec_case_workspace": 0,
+    "telco_fault_workspace": 0
+  },
+  "ran_at": "2026-04-20T05:52:11Z",
+  "duration_s": 21.96,
+  "tools": [
+    {
+      "tool": "T1_scan_live_stream",
+      "iterations": 50,
+      "read_rows_p50": 200,
+      "read_rows_unique_values": [
+        200
+      ],
+      "read_bytes_p50": 18455,
+      "read_bytes_unique_values": [
+        18455
+      ],
+      "query_duration_ms_p50": 0.0,
+      "query_duration_ms_p95": 1.0,
+      "wallclock_ms_p50": 2.16,
+      "result_rows_p50": 25,
+      "params_used": {
+        "service": "svc-notifications"
+      }
+    },
+    {
+      "tool": "T2_open_investigation",
+      "iterations": 50,
+      "read_rows_p50": 181,
+      "read_rows_unique_values": [
+        181
+      ],
+      "read_bytes_p50": 20451,
+      "read_bytes_unique_values": [
+        20451
+      ],
+      "query_duration_ms_p50": 0.0,
+      "query_duration_ms_p95": 1.0,
+      "wallclock_ms_p50": 2.321,
+      "result_rows_p50": 181,
+      "params_used": {
+        "incident_id": "INC-svc-payments-OOM"
+      }
+    },
+    {
+      "tool": "T3_recall_memory",
+      "iterations": 50,
+      "read_rows_p50": 185,
+      "read_rows_unique_values": [
+        185
+      ],
+      "read_bytes_p50": 23108,
+      "read_bytes_unique_values": [
+        23108
+      ],
+      "query_duration_ms_p50": 0.0,
+      "query_duration_ms_p95": 1.0,
+      "wallclock_ms_p50": 2.15,
+      "result_rows_p50": 9,
+      "params_used": {
+        "session_id": "sess-203"
+      }
+    },
+    {
+      "tool": "T4_semantic_search",
+      "iterations": 50,
+      "read_rows_p50": 303,
+      "read_rows_unique_values": [
+        303
+      ],
+      "read_bytes_p50": 31407,
+      "read_bytes_unique_values": [
+        31407
+      ],
+      "query_duration_ms_p50": 3.0,
+      "query_duration_ms_p95": 6.0,
+      "wallclock_ms_p50": 4.709,
+      "result_rows_p50": 4,
+      "params_used": {
+        "user_id": "u-maruthi",
+        "query_vec": "[-0.011540031,-0.003798949,0.0039386307,-0.07798769,-0.00611\u2026"
+      }
+    },
+    {
+      "tool": "T5_fetch_record",
+      "iterations": 50,
+      "read_rows_p50": 1,
+      "read_rows_unique_values": [
+        1
+      ],
+      "read_bytes_p50": 394,
+      "read_bytes_unique_values": [
+        394
+      ],
+      "query_duration_ms_p50": 1.0,
+      "query_duration_ms_p95": 2.0,
+      "wallclock_ms_p50": 2.538,
+      "result_rows_p50": 1,
+      "params_used": {
+        "incident_id": "9a476e6b-c07e-4bee-a887-4e38bfeb8516"
+      }
+    },
+    {
+      "tool": "T6_replay_session",
+      "iterations": 50,
+      "read_rows_p50": 303,
+      "read_rows_unique_values": [
+        303
+      ],
+      "read_bytes_p50": 27065,
+      "read_bytes_unique_values": [
+        27065
+      ],
+      "query_duration_ms_p50": 2.0,
+      "query_duration_ms_p95": 3.0,
+      "wallclock_ms_p50": 3.671,
+      "result_rows_p50": 10,
+      "params_used": {
+        "session_id": ""
+      }
+    },
+    {
+      "tool": "T7_save_memory",
+      "iterations": 50,
+      "read_rows_p50": 1,
+      "read_rows_unique_values": [
+        1
+      ],
+      "read_bytes_p50": 1,
+      "read_bytes_unique_values": [
+        1
+      ],
+      "query_duration_ms_p50": 3.0,
+      "query_duration_ms_p95": 9.0,
+      "wallclock_ms_p50": 5.542,
+      "result_rows_p50": 1,
+      "params_used": {
+        "user_id": "bench-user",
+        "agent_id": "bench",
+        "session_id": "bench-session",
+        "turn_id": "0",
+        "content": "benchmark write",
+        "embedding": "[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0\u2026"
+      }
+    },
+    {
+      "tool": "T8_graph_traverse",
+      "iterations": 50,
+      "read_rows_p50": 38,
+      "read_rows_unique_values": [
+        38
+      ],
+      "read_bytes_p50": 1096,
+      "read_bytes_unique_values": [
+        1096
+      ],
+      "query_duration_ms_p50": 3.0,
+      "query_duration_ms_p95": 6.0,
+      "wallclock_ms_p50": 4.971,
+      "result_rows_p50": 8,
+      "params_used": {
+        "service": "svc-api-gateway"
+      }
+    }
+  ]
+}

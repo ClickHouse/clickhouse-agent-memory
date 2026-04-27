@@ -1,0 +1,326 @@
+{
+  "agent_preset": "ai-sre-agent",
+  "agent_label": "AI SRE Agent (Observability)",
+  "user_id": "u-maruthi",
+  "question": "svc-payments is failing, walk me through it",
+  "started_at": "2026-04-19T11:05:06+00:00",
+  "brute_force_baseline_bytes": 2000000000,
+  "brute_force_baseline_latency_s": 40,
+  "steps": [
+    {
+      "operation_label": "Live event stream",
+      "reasoning": "Picked scan_live_stream because the user asked about 'svc-payments' right now. HOT-tier tail of obs_events_stream is the cheapest first pass: sub-5ms read, no vector math, no joins. If this returns zero rows we acknowledge and lean on WARM history instead of guessing.",
+      "insight_text": "2 ERROR/CRITICAL events on svc-payments in the last 15 minutes. Dominant signal: OOM.",
+      "envelope": {
+        "tier": "HOT",
+        "domain": "observability",
+        "operation": "scan_live_stream",
+        "latency_ms": 21.56,
+        "row_count": 2,
+        "insights": {
+          "filter_applied": "svc-payments",
+          "window_minutes": 15,
+          "top_service": "svc-payments",
+          "top_error": "OOM"
+        },
+        "precision": {
+          "filters_applied": [
+            "filter=svc-payments",
+            "level IN ('ERROR','CRITICAL')",
+            "ts >= now() - INTERVAL 15 MINUTE",
+            "LIMIT 20"
+          ],
+          "index_hint": "Memory engine (in-RAM, no secondary index, full table scan is cheap)",
+          "embedding_dim": null,
+          "rows_read": 200,
+          "bytes_read": 28193,
+          "rows_returned": 2,
+          "selectivity": "1.0%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "event_id": "01309926-1bf8-488e-8f06-49689069b406",
+            "ts": "2026-04-19T10:59:33.566000",
+            "service": "svc-payments",
+            "host": "svc-payments-pod-2",
+            "level": "ERROR",
+            "message": "Memory limit exceeded: OOMKilled",
+            "latency_ms": 622.388427734375,
+            "error_code": "OOM",
+            "trace_id": "trace-79993"
+          },
+          {
+            "event_id": "530c6556-03b0-4eb1-aeb5-2702b36eafc9",
+            "ts": "2026-04-19T10:59:29.566000",
+            "service": "svc-payments",
+            "host": "svc-payments-pod-4",
+            "level": "CRITICAL",
+            "message": "Request processed successfully",
+            "latency_ms": 392.8982849121094,
+            "error_code": "OOM",
+            "trace_id": "trace-92544"
+          }
+        ],
+        "sql": "-- HOT tier: live event stream for the observability domain.\n-- obs_events_stream uses ENGINE = Memory, so this read is sub-5ms\n-- and the data is volatile (cleared on container restart).\nSELECT event_id, ts, service, host, level, message,\n       latency_ms, error_code, trace_id\nFROM enterprise_memory.obs_events_stream\n-- Narrow by service name if the caller gave one; otherwise match all.\nWHERE (length({service:String}) = 0 OR service = {service:String})\n  -- Only errors + criticals; INFO / WARN are not useful for triage.\n  AND level IN ('ERROR', 'CRITICAL')\n  -- Rolling window: last N minutes of the live stream.\n  AND ts >= now() - INTERVAL {minutes:UInt32} MINUTE\nORDER BY ts DESC\nLIMIT {limit:UInt32}"
+      }
+    },
+    {
+      "operation_label": "Investigation workspace",
+      "reasoning": "Picked open_investigation because we now have a case to track and several services may be implicated. Materialising a per-case Memory table scopes the rest of the sequence cleanly rather than re-filtering the stream on every step.",
+      "insight_text": "Workspace INC-1776596705 materialised: 19 correlated events across 9 services. The investigation is now scoped to one case id.",
+      "envelope": {
+        "tier": "HOT",
+        "domain": "observability",
+        "operation": "open_investigation",
+        "latency_ms": 5.5,
+        "row_count": 9,
+        "insights": {
+          "case_id": "INC-1776596705",
+          "workspace_table": "obs_incident_workspace",
+          "groups_summarised": 9,
+          "events_loaded": 19
+        },
+        "precision": {
+          "filters_applied": [
+            "case_id=INC-1776596705",
+            "group by service / element / event_type"
+          ],
+          "index_hint": "Memory engine (INSERT ... SELECT + GROUP BY, single-pass)",
+          "embedding_dim": null,
+          "rows_read": 181,
+          "bytes_read": 12505,
+          "rows_returned": 9,
+          "selectivity": "4.97%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "service": "svc-recommendations",
+            "errors": 2,
+            "criticals": 2,
+            "avg_latency_ms": 1060.8,
+            "max_latency_ms": 1990.300048828125,
+            "error_codes": [
+              "CONN_REFUSED",
+              "DB_TIMEOUT",
+              "TLS_ERR"
+            ]
+          },
+          {
+            "service": "svc-auth",
+            "errors": 1,
+            "criticals": 1,
+            "avg_latency_ms": 1038.6,
+            "max_latency_ms": 1940.0999755859375,
+            "error_codes": [
+              "DB_TIMEOUT"
+            ]
+          },
+          {
+            "service": "svc-payments",
+            "errors": 1,
+            "criticals": 1,
+            "avg_latency_ms": 1019.2,
+            "max_latency_ms": 1933.9000244140625,
+            "error_codes": [
+              "OOM"
+            ]
+          }
+        ],
+        "sql": "-- HOT tier: open an investigation workspace for this case_id.\n        -- We copy correlated events out of the live stream into a\n        -- per-case Memory table so subsequent steps can scope to this\n        -- incident without re-filtering the stream.\n        INSERT INTO enterprise_memory.obs_incident_workspace\n        SELECT\n            {case_id:String} AS incident_id,\n            event_id, ts, service, host, level, message,\n            trace_id, latency_ms, error_code,\n            now64() AS added_at\n        FROM enterprise_memory.obs_events_stream\n        -- Correlate by service (services currently throwing ERROR/CRITICAL)\n        -- OR by a specific trace_id when the caller gave one.\n        WHERE (\n            service IN (\n                SELECT DISTINCT service\n                FROM enterprise_memory.obs_events_stream\n                WHERE level IN ('ERROR', 'CRITICAL')\n                  AND ts >= now() - INTERVAL 15 MINUTE\n            )\n            OR (length({trace_id:String}) > 0 AND trace_id = {trace_id:String})\n        )\n        -- Keep the correlation window aligned with the recent-errors window.\n        AND ts >= now() - INTERVAL 15 MINUTE\n\n\n-- Group by the natural key so we see the fault shape:\n\n        -- Group the workspace by service so we can see the fault picture\n        -- at a glance: which services are throwing errors, how often,\n        -- and which error codes are dominant.\n        SELECT service,\n               countIf(level = 'ERROR')    AS errors,\n               countIf(level = 'CRITICAL') AS criticals,\n               round(avg(latency_ms), 1)   AS avg_latency_ms,\n               round(max(latency_ms), 1)   AS max_latency_ms,\n               groupArray(DISTINCT error_code) AS error_codes\n        FROM enterprise_memory.obs_incident_workspace\n        WHERE incident_id = {case_id:String}\n        GROUP BY service\n        ORDER BY criticals DESC, errors DESC"
+      }
+    },
+    {
+      "operation_label": "Semantic search",
+      "reasoning": "Picked semantic_search because the user wants 'have we seen this before'. Vector similarity over obs_historical_incidents with HNSW + cosineDistance ranks the closest match. Keyword search would miss paraphrased titles.",
+      "insight_text": "Top historical match: \"Payment service database connection pool exhaustion\" at cosineDistance 0.1271. Root cause on record: Database connection pool limit set too low; connection leak in payment retry logic.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "observability",
+        "operation": "semantic_search",
+        "latency_ms": 25.81,
+        "row_count": 3,
+        "insights": {
+          "query_text": "svc-payments database connection pool timeout errors",
+          "k": 3,
+          "top_match": "Payment service database connection pool exhaustion",
+          "similarity_distance": 0.1271,
+          "top_root_cause": "Database connection pool limit set too low; connection leak in payment retry logic"
+        },
+        "precision": {
+          "filters_applied": [
+            "ORDER BY cosineDistance(embedding, query_vec) ASC",
+            "LIMIT 3"
+          ],
+          "index_hint": "HNSW vector_similarity('hnsw', 'cosineDistance', 768) on `embedding` column",
+          "embedding_dim": 768,
+          "rows_read": 13,
+          "bytes_read": 26080,
+          "rows_returned": 3,
+          "selectivity": "23.08%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "incident_id": "bbae4d54-4e69-4eca-902b-4fea743117f3",
+            "ts": "2025-10-22T07:03:18.279000",
+            "title": "Payment service database connection pool exhaustion",
+            "affected_services": [
+              "svc-payments",
+              "svc-orders"
+            ],
+            "root_cause": "Database connection pool limit set too low; connection leak in payment retry logic",
+            "resolution": "Increased pool size from 50 to 200, fixed connection leak, added circuit breaker",
+            "severity": "P1",
+            "duration_min": 45,
+            "similarity_distance": 0.1271
+          },
+          {
+            "incident_id": "d2f0e7d2-e53e-48af-ae02-defb2bc0f652",
+            "ts": "2026-03-24T15:03:18.279000",
+            "title": "Payment service TLS certificate expiry causing 503s",
+            "affected_services": [
+              "svc-payments",
+              "svc-orders"
+            ],
+            "root_cause": "Certificate renewal automation failed silently 30 days prior; no alerting on expiry",
+            "resolution": "Renewed certificate, implemented cert-manager with 30-day pre-expiry alerts",
+            "severity": "P1",
+            "duration_min": 8,
+            "similarity_distance": 0.2972
+          },
+          {
+            "incident_id": "8d3d75be-8bef-42e1-9c32-6de6070c8b21",
+            "ts": "2025-12-27T10:03:18.279000",
+            "title": "Inventory service deadlock during flash sale",
+            "affected_services": [
+              "svc-inventory",
+              "svc-orders"
+            ],
+            "root_cause": "Optimistic locking not implemented; concurrent stock updates caused deadlock",
+            "resolution": "Implemented optimistic locking with retry, added Redis-based distributed lock",
+            "severity": "P2",
+            "duration_min": 35,
+            "similarity_distance": 0.3545
+          }
+        ],
+        "sql": "-- WARM tier: SEMANTIC SEARCH over past observability incidents.\n-- `embedding` is Array(Float32). cosineDistance returns 0 for an\n-- identical vector and 2 for the opposite direction, so LOWER is\n-- more similar. The HNSW index makes the ORDER BY LIMIT k fast.\nSELECT incident_id, ts, title, affected_services,\n       root_cause, resolution,\n       toString(severity) AS severity, duration_min,\n       -- Rounded copy for display; the un-rounded form drives the sort.\n       round(cosineDistance(embedding, [<query embedding vector>]), 4) AS similarity_distance\nFROM enterprise_memory.obs_historical_incidents\n-- ORDER BY uses the un-rounded distance so the HNSW index kicks in.\nORDER BY cosineDistance(embedding, [<query embedding vector>]) ASC\nLIMIT {k:UInt32}"
+      }
+    },
+    {
+      "operation_label": "Record fetch by id",
+      "reasoning": "Picked fetch_record(kind='runbook') because we have a high-similarity match and need the concrete past resolution, not another vector ranking. Single-row PK lookup on incident_id.",
+      "insight_text": "Runbook for incident bbae4d54-4e69-4eca-902b-4fea743117f3. Past resolution: Increased pool size from 50 to 200, fixed connection leak, added circuit breaker. Becomes the basis for the Recommended block.",
+      "envelope": {
+        "tier": "WARM",
+        "domain": "observability",
+        "operation": "fetch_runbook",
+        "latency_ms": 6.94,
+        "row_count": 1,
+        "insights": {
+          "kind": "runbook",
+          "identifier": "bbae4d54-4e69-4eca-902b-4fea743117f3",
+          "query": null,
+          "matches": 1,
+          "resolution": "Increased pool size from 50 to 200, fixed connection leak, added circuit breaker"
+        },
+        "precision": {
+          "filters_applied": [
+            "WHERE incident_id = 'bbae4d54-4e69-4eca-902b-4fea743117f3'"
+          ],
+          "index_hint": "Primary-key lookup on incident_id (MergeTree ORDER BY prefix)",
+          "embedding_dim": null,
+          "rows_read": 8,
+          "bytes_read": 395,
+          "rows_returned": 1,
+          "selectivity": "12.5%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "incident_id": "bbae4d54-4e69-4eca-902b-4fea743117f3",
+            "title": "Payment service database connection pool exhaustion",
+            "root_cause": "Database connection pool limit set too low; connection leak in payment retry logic",
+            "resolution": "Increased pool size from 50 to 200, fixed connection leak, added circuit breaker",
+            "duration_min": 45,
+            "severity": "P1",
+            "affected_services": [
+              "svc-payments",
+              "svc-orders"
+            ]
+          }
+        ],
+        "sql": "-- WARM tier: FETCH A RUNBOOK BY ID.\n-- Deterministic lookup: no vector math, just the full\n-- historical incident row so the agent can quote the resolution.\nSELECT incident_id, title, root_cause, resolution,\n       duration_min, toString(severity) AS severity, affected_services\nFROM enterprise_memory.obs_historical_incidents\nWHERE incident_id = {identifier:String}"
+      }
+    },
+    {
+      "operation_label": "Graph traversal",
+      "reasoning": "Picked graph_traverse because we now need the blast radius to size the fix. obs_dependencies JOIN obs_services as a PK-joined graph is the right shape: two indexed joins + UNION ALL for 1-hop and 2-hop.",
+      "insight_text": "Blast radius: 1 direct + 2 indirect dependents, 2 of them critical. Scope is real but contained.",
+      "envelope": {
+        "tier": "GRAPH",
+        "domain": "observability",
+        "operation": "graph_traverse",
+        "latency_ms": 24.03,
+        "row_count": 3,
+        "insights": {
+          "start_entity": "svc-payments",
+          "direct_neighbours": 1,
+          "indirect_neighbours": 2,
+          "critical_services_affected": 2
+        },
+        "precision": {
+          "filters_applied": [
+            "start entity: svc-payments",
+            "max_hops=2",
+            "JOIN on service_id / element_id / asset_id (indexed PKs)"
+          ],
+          "index_hint": "MergeTree PK JOINs + UNION ALL over 1-hop and 2-hop branches",
+          "embedding_dim": null,
+          "rows_read": 53,
+          "bytes_read": 1548,
+          "rows_returned": 3,
+          "selectivity": "5.66%",
+          "written_rows": null
+        },
+        "rows_preview": [
+          {
+            "related": "svc-orders",
+            "criticality": "high",
+            "team": "Commerce",
+            "edge_type": "sync",
+            "latency_p99": 80.0,
+            "hops": 1
+          },
+          {
+            "related": "svc-analytics",
+            "criticality": "medium",
+            "team": "Data",
+            "edge_type": "async",
+            "latency_p99": 8.0,
+            "hops": 2
+          },
+          {
+            "related": "svc-api-gateway",
+            "criticality": "critical",
+            "team": "Platform",
+            "edge_type": "sync",
+            "latency_p99": 45.0,
+            "hops": 2
+          }
+        ],
+        "sql": "-- GRAPH tier: multi-hop dependency traversal for observability.\n-- Question: \"who depends on <service>?\" (upstream blast radius).\n--\n-- Hop 1: direct dependents of the target service.\nSELECT d.from_service AS related, s.criticality, s.team,\n       d.dep_type AS edge_type, d.latency_p99, 1 AS hops\nFROM enterprise_memory.obs_dependencies d\nJOIN enterprise_memory.obs_services s ON s.service_id = d.from_service\nWHERE d.to_service = {entity:String}\n\nUNION ALL\n\n-- Hop 2: services that depend on services that depend on the target.\n-- Only emitted when max_hops >= 2.\nSELECT d2.from_service, s2.criticality, s2.team,\n       d2.dep_type, d2.latency_p99, 2 AS hops\nFROM enterprise_memory.obs_dependencies d2\nJOIN enterprise_memory.obs_services s2 ON s2.service_id = d2.from_service\nWHERE d2.to_service IN (\n    SELECT from_service FROM enterprise_memory.obs_dependencies\n    WHERE to_service = {entity:String}\n)\nAND {max_hops:UInt32} >= 2"
+      }
+    }
+  ],
+  "final_brief": {
+    "fields": {
+      "Trigger": "svc-payments / OOM",
+      "Blast radius": "1 direct / 2 indirect / 2 critical",
+      "Top historical match": "Payment service database connection pool exhaustion (cosineDistance 0.1271)",
+      "Case id": "INC-1776596705"
+    },
+    "recommended": "Apply the resolution from the top historical match in the fetch_record step. Watch the direct dependents in Step 5 for cascading timeouts. Re-run scan_live_stream in ten minutes to confirm the fix."
+  }
+}

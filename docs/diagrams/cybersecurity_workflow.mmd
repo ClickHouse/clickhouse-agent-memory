@@ -1,0 +1,34 @@
+sequenceDiagram
+    participant Events as sec_events_stream<br/>(Memory Engine)
+    participant Agent as AI SOC Agent
+    participant Workspace as sec_case_workspace<br/>(Memory Engine)
+    participant Graph as sec_users + sec_assets<br/>+ sec_access (SQL JOINs)
+    participant ThreatDB as sec_threat_intel<br/>(MergeTree + Vector)
+    participant History as sec_historical_incidents<br/>(MergeTree + Vector)
+
+    Note over Events,History: Step 1 -- HOT MEMORY
+    Agent->>Events: SELECT high-severity events<br/>with triage scoring
+    Events-->>Agent: Top alert: login_success by user-006<br/>on asset-001 from 185.220.101.47
+
+    Note over Events,History: Step 2 -- HOT MEMORY
+    Agent->>Workspace: INSERT correlated events<br/>(same user, asset, IP -- last 60 min)
+    Workspace-->>Agent: Case CASE-xxx created<br/>with N events correlated
+
+    Note over Events,History: Step 3 -- GRAPH MEMORY
+    Agent->>Graph: SELECT user profile, asset criticality,<br/>access rights (3 SQL JOINs)
+    Graph-->>Agent: User: DB Admin, MFA: NO<br/>Asset: CRITICAL / PII, Has access: YES
+
+    Note over Events,History: Step 4 -- WARM MEMORY
+    Agent->>ThreatDB: Exact IoC lookup on IP<br/>+ cosineDistance vector search
+    ThreatDB-->>Agent: MATCH: FIN6 / Operation FinFisher<br/>Confidence: 95%
+
+    Note over Events,History: Step 5 -- WARM MEMORY
+    Agent->>History: cosineDistance vector search<br/>for similar attack patterns
+    History-->>Agent: Top match: Admin account<br/>compromised via credential stuffing
+
+    Note over Events,History: Step 6 -- HOT MEMORY
+    Agent->>Events: SELECT behaviour analytics<br/>for user-006 and src IP
+    Events-->>Agent: Behaviour risk score: 0.70<br/>(HIGH RISK)
+
+    Note over Events,History: Step 7 -- RESULT
+    Agent->>Agent: Synthesise threat context<br/>Confidence: 80%<br/>Response: IMMEDIATE suspension

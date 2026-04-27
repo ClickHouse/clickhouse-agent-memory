@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enterprise Agent Memory -- Session report</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ch-yellow: #FAFF69;
+    --ch-yellow-ink: #1E1E1E;
+    --ch-red: #FC2424;
+    --ch-purple: #8430CE;
+    --ch-bg: #0F0F10;
+    --ch-panel: #17171A;
+    --ch-panel-2: #1F1F24;
+    --ch-border: #2A2A32;
+    --ch-text: #F5F5F7;
+    --ch-muted: #9CA0AD;
+    --ch-good: #34A853;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+           'Helvetica Neue', Arial, sans-serif;
+    --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace,
+           SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--ch-bg); color: var(--ch-text); }
+  body {
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--ch-yellow); text-decoration: none; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+  /* Top bar (brand strip) */
+  header.top {
+    background: var(--ch-bg);
+    border-bottom: 1px solid var(--ch-border);
+    padding: 18px 32px;
+  }
+  header.top .inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  .brand .block-red, .brand .block-yellow {
+    display: inline-block; width: 10px; height: 18px; border-radius: 2px;
+  }
+  .brand .block-red { background: var(--ch-red); }
+  .brand .block-yellow { background: var(--ch-yellow); }
+  .meta-chips { display: flex; gap: 12px; font-size: 12px; color: var(--ch-muted); }
+  .meta-chips span { font-family: var(--mono); }
+
+  /* Hero */
+  .hero { padding: 72px 0 48px; }
+  .hero .eyebrow {
+    font-size: 12px; color: var(--ch-yellow);
+    text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-size: 44px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.1; margin-bottom: 24px;
+  }
+  .hero h1 .question {
+    font-family: var(--mono); font-size: 24px; font-weight: 500;
+    color: var(--ch-muted); display: block; margin-top: 8px;
+  }
+  .hero .subtitle { color: var(--ch-muted); font-size: 16px; max-width: 780px; }
+
+  /* Scorecard */
+  section.scorecard { padding: 32px 0 48px; }
+  .scorecard h2 {
+    font-size: 13px; font-weight: 600; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin-bottom: 20px;
+  }
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    margin-bottom: 28px;
+  }
+  .kpi {
+    background: var(--ch-panel); border: 1px solid var(--ch-border);
+    border-radius: 4px; padding: 24px;
+    position: relative; overflow: hidden;
+  }
+  .kpi.hero-kpi { border-top: 3px solid var(--ch-yellow); }
+  .kpi-value {
+    font-family: var(--mono); font-size: 32px; font-weight: 600;
+    color: var(--ch-text); letter-spacing: -0.01em;
+  }
+  .kpi-value .unit { font-size: 14px; color: var(--ch-muted); margin-left: 4px; }
+  .kpi-label {
+    font-size: 11px; color: var(--ch-muted); text-transform: uppercase;
+    letter-spacing: 0.12em; margin-top: 8px;
+  }
+  .kpi-note {
+    font-size: 12px; color: var(--ch-muted); margin-top: 6px;
+  }
+  .scorecard-narrative {
+    background: var(--ch-panel); border-left: 3px solid var(--ch-yellow);
+    padding: 20px 24px; font-size: 15px; color: var(--ch-text);
+    border-radius: 0 4px 4px 0;
+  }
+  .scorecard-narrative strong { color: var(--ch-yellow); }
+
+  /* Steps */
+  section.steps { padding: 32px 0 48px; }
+  section.steps h2 {
+    font-size: 13px; font-weight: 600; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin-bottom: 24px;
+  }
+  article.step {
+    background: var(--ch-panel); border: 1px solid var(--ch-border);
+    border-left: 3px solid var(--ch-border);
+    border-radius: 4px; padding: 28px; margin-bottom: 20px;
+  }
+  article.step.hot   { border-left-color: var(--ch-red); }
+  article.step.warm  { border-left-color: var(--ch-purple); }
+  article.step.graph { border-left-color: var(--ch-yellow); }
+  article.step.empty { opacity: 0.92; }
+  .step-header {
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .step-number {
+    font-family: var(--mono); font-size: 11px; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+  }
+  .step-label {
+    font-size: 20px; font-weight: 600; color: var(--ch-text);
+  }
+  .tier-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 3px 8px; border-radius: 3px;
+    border: 1px solid var(--ch-border); color: var(--ch-muted);
+  }
+  .tier-chip .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; background: var(--ch-muted);
+  }
+  .tier-chip.hot .dot   { background: var(--ch-red); }
+  .tier-chip.warm .dot  { background: var(--ch-purple); }
+  .tier-chip.graph .dot { background: var(--ch-yellow); }
+  .step-latency {
+    font-family: var(--mono); font-size: 13px; color: var(--ch-muted);
+    margin-left: auto;
+  }
+  .step-latency b { color: var(--ch-yellow); font-weight: 600; }
+
+  .step-section { margin-top: 18px; }
+  .step-section h4 {
+    font-size: 11px; font-weight: 600; color: var(--ch-muted);
+    text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 10px;
+  }
+  .step-reasoning p {
+    font-style: italic; color: var(--ch-text); font-size: 15px;
+    max-width: 900px;
+  }
+  .step-sql pre {
+    background: var(--ch-panel-2); border: 1px solid var(--ch-border);
+    border-radius: 4px; padding: 18px 20px;
+    overflow-x: auto; font-family: var(--mono); font-size: 13px;
+    line-height: 1.5; color: var(--ch-text);
+    white-space: pre;
+  }
+  .step-sql .sql-comment { color: var(--ch-muted); font-style: italic; }
+  .step-sql .sql-keyword { color: var(--ch-yellow); font-weight: 600; }
+  .step-sql .sql-string  { color: #E7B4FF; }
+  .step-sql .sql-number  { color: #9DDAFF; }
+
+  .step-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    margin-top: 18px;
+  }
+  .step-precision ul { list-style: none; padding-left: 0; }
+  .step-precision li {
+    font-family: var(--mono); font-size: 13px; color: var(--ch-text);
+    padding: 5px 0; border-bottom: 1px dashed var(--ch-border);
+    display: flex; justify-content: space-between; gap: 16px;
+  }
+  .step-precision li:last-child { border-bottom: 0; }
+  .step-precision li .k { color: var(--ch-muted); flex-shrink: 0; }
+  .step-precision li .v { text-align: right; color: var(--ch-text); }
+  .step-precision li .v.highlight { color: var(--ch-yellow); font-weight: 600; }
+  .step-insight {
+    background: var(--ch-panel-2); border-radius: 4px;
+    padding: 18px 20px;
+  }
+  .step-insight p { color: var(--ch-text); font-size: 15px; }
+
+  .step-empty-note {
+    background: rgba(252, 36, 36, 0.08);
+    border: 1px solid rgba(252, 36, 36, 0.35);
+    border-radius: 4px; padding: 16px 20px;
+    color: #FFB3B3;
+  }
+  .step-empty-note strong { color: var(--ch-red); }
+
+  /* Final brief */
+  section.brief { padding: 32px 0 64px; }
+  .brief-card {
+    background: var(--ch-panel); border: 1px solid var(--ch-border);
+    border-top: 3px solid var(--ch-yellow); border-radius: 4px;
+    padding: 32px;
+  }
+  .brief-card h2 {
+    font-size: 24px; font-weight: 700; letter-spacing: -0.01em;
+    margin-bottom: 16px;
+  }
+  .brief-card ul { list-style: none; padding: 0; margin: 16px 0; }
+  .brief-card li {
+    padding: 10px 0; border-bottom: 1px dashed var(--ch-border);
+    font-size: 15px;
+  }
+  .brief-card li:last-child { border-bottom: 0; }
+  .brief-card li b { color: var(--ch-yellow); margin-right: 8px; }
+  .brief-card .recommended {
+    background: rgba(250, 255, 105, 0.08);
+    border: 1px solid rgba(250, 255, 105, 0.25);
+    border-radius: 4px; padding: 18px 20px; margin-top: 20px;
+    font-size: 15px;
+  }
+  .brief-card .recommended strong { color: var(--ch-yellow); }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--ch-border);
+    padding: 24px 32px;
+    text-align: center; color: var(--ch-muted); font-size: 12px;
+    font-family: var(--mono);
+  }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .step-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 34px; }
+  }
+
+  @media print {
+    body { background: white; color: #111; }
+    .kpi { background: #f5f5f7; border-color: #ddd; }
+    article.step { background: white; border-color: #ddd; page-break-inside: avoid; }
+    .step-sql pre { background: #f5f5f7; border-color: #ddd; color: #111; }
+    .step-insight { background: #f5f5f7; }
+    .brief-card { background: white; border-color: #ddd; }
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="inner">
+      <div class="brand">
+        <span class="block-red"></span><span class="block-yellow"></span>
+        <span>enterprise_agent_memory / on ClickHouse</span>
+      </div>
+      <div class="meta-chips">
+        <span>AI NetOps Agent (Telco)</span>
+        <span>user: u-maruthi</span>
+        <span>2026-04-19T11:05:06+00:00</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="page">
+      <div class="eyebrow">Session trace / solution architect report</div>
+      <h1>
+        How the agent answered:
+        <span class="question">core-router-01 is degraded, assess the impact and find a past fix</span>
+      </h1>
+      <p class="subtitle">
+        Every tool invocation, the SQL ClickHouse ran, the physical rows scanned,
+        the selectivity, and the insight the agent produced. Built so any solution
+        architect can explain exactly why this is precise work, not brute force.
+      </p>
+    </div>
+  </section>
+
+  
+    <section class="scorecard">
+      <div class="page">
+        <h2>Precision Scorecard</h2>
+        <div class="kpi-grid">
+          <div class="kpi hero-kpi">
+            <div class="kpi-value">98</div>
+            <div class="kpi-label">Physical rows scanned</div>
+            <div class="kpi-note">Across 5 tool call(s)</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-value">26.0 KB</div>
+            <div class="kpi-label">Bytes read</div>
+            <div class="kpi-note">0.0018% of a brute-force full scan</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-value">35.0 ms</div>
+            <div class="kpi-label">End-to-end latency</div>
+            <div class="kpi-note">Sum of ClickHouse query times</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-value">5<span class="unit">tools</span></div>
+            <div class="kpi-label">Distinct retrievals</div>
+            <div class="kpi-note">0 empty-state signal(s) handled honestly</div>
+          </div>
+        </div>
+        <div class="scorecard-narrative">
+          The agent answered the question with <strong>98</strong>
+          physical rows read and <strong>26.0 KB</strong> of
+          scan I/O, in <strong>35.0 ms</strong> across
+          <strong>5</strong> targeted ClickHouse queries.
+          A naive brute-force approach over the same data would have read
+          ~1.4 GB and taken ~25s.
+          Every query used a filter, an index, or a partition-prune; none
+          was an unbounded scan.
+        </div>
+      </div>
+    </section>
+    
+
+  <section class="steps">
+    <div class="page">
+      <h2>Reasoning trace</h2>
+      
+    <article class="step hot">
+      <header class="step-header">
+        <span class="step-number">Step 1</span>
+        <span class="step-label">Live element state</span>
+        <span class="tier-chip hot"><span class="dot"></span>HOT</span>
+        <span class="step-latency">tool <b>scan_live_stream</b> · 2.73 ms</span>
+      </header>
+
+      <div class="step-section step-reasoning">
+        <h4>Why this tool</h4>
+        <p>Picked scan_live_stream because the user asked about &#x27;core-router-01&#x27; current state. telco_network_state is a Memory-engine live mirror of SNMP/telemetry pollers, sub-5ms to read, and we filter by element + health predicate so the scan stays tight.</p>
+      </div>
+
+      <div class="step-section step-sql">
+        <h4>ClickHouse query</h4>
+        <pre><code><span class="sql-comment">-- HOT tier: live network element state (Memory engine).</span>
+<span class="sql-comment">-- telco_network_state is updated by SNMP / telemetry pollers; each</span>
+<span class="sql-comment">-- row is the latest-known state of one network element.</span>
+<span class="sql-keyword">SELECT</span> element_id, element_type, vendor, region, status,
+       cpu_pct, mem_pct, traffic_gbps, error_rate, last_seen
+<span class="sql-keyword">FROM</span> enterprise_memory.telco_network_state
+<span class="sql-comment">-- Narrow by element, by region, <span class="sql-keyword">or</span> leave open (empty filter).</span>
+<span class="sql-keyword">WHERE</span> (length({service:String}) = <span class="sql-number">0</span>
+       <span class="sql-keyword">OR</span> element_id = {service:String}
+       <span class="sql-keyword">OR</span> region = {service:String})
+  <span class="sql-comment">-- Only unhealthy state: degraded/down, abnormal error rate, <span class="sql-keyword">or</span></span>
+  <span class="sql-comment">-- CPU over <span class="sql-number">80</span>% -- anything we would want an operator to look at.</span>
+  <span class="sql-keyword">AND</span> (status <span class="sql-keyword">IN</span> (<span class="sql-string">&#x27;degraded&#x27;</span>, <span class="sql-string">&#x27;down&#x27;</span>)
+       <span class="sql-keyword">OR</span> error_rate &gt; <span class="sql-number">0</span>.<span class="sql-number">01</span>
+       <span class="sql-keyword">OR</span> cpu_pct &gt; <span class="sql-number">80</span>)
+<span class="sql-comment">-- Rank down first, then degraded, then sort by error rate.</span>
+<span class="sql-keyword">ORDER BY</span>
+  CASE status WHEN <span class="sql-string">&#x27;down&#x27;</span> THEN <span class="sql-number">1</span> WHEN <span class="sql-string">&#x27;degraded&#x27;</span> THEN <span class="sql-number">2</span> ELSE <span class="sql-number">3</span> END,
+  error_rate DESC
+<span class="sql-keyword">LIMIT</span> {<span class="sql-keyword">limit</span>:UInt32}</code></pre>
+      </div>
+
+      <div class="step-section step-grid">
+        <div class="step-precision">
+          <h4>Precision signature</h4>
+          <ul><li><span class="k">Rows read</span><span class="v highlight">12</span></li><li><span class="k">Bytes read</span><span class="v">935 B</span></li><li><span class="k">Rows returned</span><span class="v">1</span></li><li><span class="k">Selectivity</span><span class="v highlight">8.33%</span></li><li><span class="k">Filter</span><span class="v">filter=core-router-01</span></li><li><span class="k">Filter</span><span class="v">status IN (&#x27;degraded&#x27;,&#x27;down&#x27;) OR error_rate &gt; 1%</span></li><li><span class="k">Filter</span><span class="v">last_seen implied</span></li><li><span class="k">Filter</span><span class="v">LIMIT 20</span></li><li><span class="k">Index hint</span><span class="v">Memory engine (in-RAM, no secondary index, full table scan is cheap)</span></li></ul>
+        </div>
+        <div>
+          <h4>Result</h4>
+          <div class="step-insight"><p>1 unhealthy element(s). Worst: core-router-01 (up). This is the element to investigate.</p></div>
+        </div>
+      </div>
+    </article>
+    
+    <article class="step hot">
+      <header class="step-header">
+        <span class="step-number">Step 2</span>
+        <span class="step-label">Fault workspace</span>
+        <span class="tier-chip hot"><span class="dot"></span>HOT</span>
+        <span class="step-latency">tool <b>open_investigation</b> · 3.19 ms</span>
+      </header>
+
+      <div class="step-section step-reasoning">
+        <h4>Why this tool</h4>
+        <p>Picked open_investigation because several elements may be correlated and we want a single case_id to scope the rest. telco_fault_workspace gives us a grouped-by-element view in one query.</p>
+      </div>
+
+      <div class="step-section step-sql">
+        <h4>ClickHouse query</h4>
+        <pre><code><span class="sql-comment">-- HOT tier: open a fault workspace for this case_id.</span>
+        <span class="sql-comment">-- Each row pairs the fault_id with the element + its current</span>
+        <span class="sql-comment">-- error_rate so the follow-up summary step can <span class="sql-keyword">group by</span> element.</span>
+        <span class="sql-keyword">INSERT INTO</span> enterprise_memory.telco_fault_workspace
+        <span class="sql-keyword">SELECT</span>
+            {case_id:String} <span class="sql-keyword">AS</span> fault_id,
+            element_id,
+            last_seen <span class="sql-keyword">AS</span> ts,
+            <span class="sql-string">&#x27;composite&#x27;</span> <span class="sql-keyword">AS</span> metric,
+            error_rate <span class="sql-keyword">AS</span> value,
+            <span class="sql-number">0</span>.<span class="sql-number">01</span> <span class="sql-keyword">AS</span> threshold,
+            status <span class="sql-keyword">AS</span> severity,
+            now64() <span class="sql-keyword">AS</span> added_at
+        <span class="sql-keyword">FROM</span> enterprise_memory.telco_network_state
+        <span class="sql-comment">-- Unhealthy elements only: degraded/down <span class="sql-keyword">or</span> above the error threshold.</span>
+        <span class="sql-keyword">WHERE</span> status <span class="sql-keyword">IN</span> (<span class="sql-string">&#x27;degraded&#x27;</span>, <span class="sql-string">&#x27;down&#x27;</span>) <span class="sql-keyword">OR</span> error_rate &gt; <span class="sql-number">0</span>.<span class="sql-number">01</span>
+
+
+<span class="sql-comment">-- <span class="sql-keyword">Group by</span> the natural key so we see the fault shape:</span>
+
+        <span class="sql-comment">-- Group the fault workspace by element + severity so one row per</span>
+        <span class="sql-comment">-- element shows the worst <span class="sql-keyword">and</span> average error rate the agent saw.</span>
+        <span class="sql-keyword">SELECT</span> element_id, severity,
+               <span class="sql-keyword">count()</span> <span class="sql-keyword">AS</span> events,
+               <span class="sql-keyword">round</span>(<span class="sql-keyword">avg</span>(value), <span class="sql-number">4</span>) <span class="sql-keyword">AS</span> avg_error_rate,
+               <span class="sql-keyword">round</span>(<span class="sql-keyword">max</span>(value), <span class="sql-number">4</span>) <span class="sql-keyword">AS</span> max_error_rate
+        <span class="sql-keyword">FROM</span> enterprise_memory.telco_fault_workspace
+        <span class="sql-keyword">WHERE</span> fault_id = {case_id:String}
+        <span class="sql-keyword">GROUP BY</span> element_id, severity
+        <span class="sql-keyword">ORDER BY</span> max_error_rate DESC</code></pre>
+      </div>
+
+      <div class="step-section step-grid">
+        <div class="step-precision">
+          <h4>Precision signature</h4>
+          <ul><li><span class="k">Rows read</span><span class="v highlight">12</span></li><li><span class="k">Bytes read</span><span class="v">744 B</span></li><li><span class="k">Rows returned</span><span class="v">12</span></li><li><span class="k">Selectivity</span><span class="v highlight">100.0%</span></li><li><span class="k">Filter</span><span class="v">case_id=FAULT-1776596706</span></li><li><span class="k">Filter</span><span class="v">group by service / element / event_type</span></li><li><span class="k">Index hint</span><span class="v">Memory engine (INSERT ... SELECT + GROUP BY, single-pass)</span></li></ul>
+        </div>
+        <div>
+          <h4>Result</h4>
+          <div class="step-insight"><p>Fault workspace FAULT-1776596706 materialised: 12 event(s) across 12 element grouping(s).</p></div>
+        </div>
+      </div>
+    </article>
+    
+    <article class="step warm">
+      <header class="step-header">
+        <span class="step-number">Step 3</span>
+        <span class="step-label">Semantic search</span>
+        <span class="tier-chip warm"><span class="dot"></span>WARM</span>
+        <span class="step-latency">tool <b>semantic_search</b> · 16.2 ms</span>
+      </header>
+
+      <div class="step-section step-reasoning">
+        <h4>Why this tool</h4>
+        <p>Picked semantic_search because the user wants &#x27;have we seen this fault shape before&#x27;. telco_network_events has a vector index so ranking by cosineDistance finds past faults with similar symptom text.</p>
+      </div>
+
+      <div class="step-section step-sql">
+        <h4>ClickHouse query</h4>
+        <pre><code><span class="sql-comment">-- WARM tier: SEMANTIC SEARCH over past telco network events.</span>
+<span class="sql-comment">-- Same pattern: <span class="sql-keyword">cosineDistance</span> over the event description vector.</span>
+<span class="sql-keyword">SELECT</span> event_id, ts, element_id, event_type, description,
+       root_cause, resolution, impact_score, customers_aff,
+       <span class="sql-keyword">round</span>(<span class="sql-keyword">cosineDistance</span>(embedding, [&lt;query embedding vector&gt;]), <span class="sql-number">4</span>) <span class="sql-keyword">AS</span> similarity_distance
+<span class="sql-keyword">FROM</span> enterprise_memory.telco_network_events
+<span class="sql-keyword">ORDER BY</span> <span class="sql-keyword">cosineDistance</span>(embedding, [&lt;query embedding vector&gt;]) ASC
+<span class="sql-keyword">LIMIT</span> {k:UInt32}</code></pre>
+      </div>
+
+      <div class="step-section step-grid">
+        <div class="step-precision">
+          <h4>Precision signature</h4>
+          <ul><li><span class="k">Rows read</span><span class="v highlight">10</span></li><li><span class="k">Bytes read</span><span class="v">21.8 KB</span></li><li><span class="k">Rows returned</span><span class="v">3</span></li><li><span class="k">Selectivity</span><span class="v highlight">30.0%</span></li><li><span class="k">Filter</span><span class="v">ORDER BY cosineDistance(embedding, query_vec) ASC</span></li><li><span class="k">Filter</span><span class="v">LIMIT 3</span></li><li><span class="k">Index hint</span><span class="v">HNSW vector_similarity(&#x27;hnsw&#x27;, &#x27;cosineDistance&#x27;, 768) on `embedding` column</span></li><li><span class="k">Embedding dim</span><span class="v">768</span></li></ul>
+        </div>
+        <div>
+          <h4>Result</h4>
+          <div class="step-insight"><p>Top historical match: &quot;Core router line card failure causing 30% traffic loss on backbone&quot; at cosineDistance 0.2024. Root cause: Faulty ASIC on line card LC-7 due to manufacturing defect.</p></div>
+        </div>
+      </div>
+    </article>
+    
+    <article class="step warm">
+      <header class="step-header">
+        <span class="step-number">Step 4</span>
+        <span class="step-label">Event fetch by id</span>
+        <span class="tier-chip warm"><span class="dot"></span>WARM</span>
+        <span class="step-latency">tool <b>fetch_runbook</b> · 4.15 ms</span>
+      </header>
+
+      <div class="step-section step-reasoning">
+        <h4>Why this tool</h4>
+        <p>Picked fetch_record(kind=&#x27;runbook&#x27;) to pull the full past-event row including resolution and customer-impact numbers. PK lookup on event_id; one row.</p>
+      </div>
+
+      <div class="step-section step-sql">
+        <h4>ClickHouse query</h4>
+        <pre><code><span class="sql-comment">-- WARM tier: FETCH A NETWORK EVENT BY ID.</span>
+<span class="sql-comment">-- Deterministic lookup for the resolution of a specific past event.</span>
+<span class="sql-keyword">SELECT</span> event_id, element_id, event_type, description,
+       root_cause, resolution, impact_score, customers_aff
+<span class="sql-keyword">FROM</span> enterprise_memory.telco_network_events
+<span class="sql-keyword">WHERE</span> event_id = {identifier:String}</code></pre>
+      </div>
+
+      <div class="step-section step-grid">
+        <div class="step-precision">
+          <h4>Precision signature</h4>
+          <ul><li><span class="k">Rows read</span><span class="v highlight">7</span></li><li><span class="k">Bytes read</span><span class="v">352 B</span></li><li><span class="k">Rows returned</span><span class="v">1</span></li><li><span class="k">Selectivity</span><span class="v highlight">14.29%</span></li><li><span class="k">Filter</span><span class="v">WHERE incident_id = &#x27;45ed9769-eac2-48df-bc9c-c4ed3ea868c4&#x27;</span></li><li><span class="k">Index hint</span><span class="v">Primary-key lookup on incident_id (MergeTree ORDER BY prefix)</span></li></ul>
+        </div>
+        <div>
+          <h4>Result</h4>
+          <div class="step-insight"><p>Past event fetched. Resolution: Hot-swapped line card, traffic rerouted via backup path during replacement. These are the concrete steps we would reapply.</p></div>
+        </div>
+      </div>
+    </article>
+    
+    <article class="step graph">
+      <header class="step-header">
+        <span class="step-number">Step 5</span>
+        <span class="step-label">Topology traversal</span>
+        <span class="tier-chip graph"><span class="dot"></span>GRAPH</span>
+        <span class="step-latency">tool <b>graph_traverse</b> · 8.71 ms</span>
+      </header>
+
+      <div class="step-section step-reasoning">
+        <h4>Why this tool</h4>
+        <p>Picked graph_traverse to map downstream topology impact. telco_connections JOIN telco_elements walks fiber / backhaul links one and two hops out from the fault element.</p>
+      </div>
+
+      <div class="step-section step-sql">
+        <h4>ClickHouse query</h4>
+        <pre><code><span class="sql-comment">-- GRAPH tier: multi-hop topology traversal for telco.</span>
+<span class="sql-comment">-- Question: &quot;what network elements are downstream of &lt;element&gt;?&quot;</span>
+<span class="sql-comment">--</span>
+<span class="sql-comment">-- Hop <span class="sql-number">1</span>: direct downstream elements.</span>
+<span class="sql-keyword">SELECT</span> c.to_element <span class="sql-keyword">AS</span> related, e.element_type, e.vendor,
+       c.link_type <span class="sql-keyword">AS</span> edge_type, c.capacity_gbps, c.latency_ms, <span class="sql-number">1</span> <span class="sql-keyword">AS</span> hops
+<span class="sql-keyword">FROM</span> enterprise_memory.telco_connections c
+<span class="sql-keyword">JOIN</span> enterprise_memory.telco_elements e <span class="sql-keyword">ON</span> e.element_id = c.to_element
+<span class="sql-keyword">WHERE</span> c.from_element = {entity:String}
+
+<span class="sql-keyword">UNION ALL</span>
+
+<span class="sql-comment">-- Hop <span class="sql-number">2</span>: downstream-of-downstream (two fiber/link hops out).</span>
+<span class="sql-keyword">SELECT</span> c2.to_element, e2.element_type, e2.vendor,
+       c2.link_type, c2.capacity_gbps, c2.latency_ms, <span class="sql-number">2</span> <span class="sql-keyword">AS</span> hops
+<span class="sql-keyword">FROM</span> enterprise_memory.telco_connections c2
+<span class="sql-keyword">JOIN</span> enterprise_memory.telco_elements e2 <span class="sql-keyword">ON</span> e2.element_id = c2.to_element
+<span class="sql-keyword">WHERE</span> c2.from_element <span class="sql-keyword">IN</span> (
+    <span class="sql-keyword">SELECT</span> to_element <span class="sql-keyword">FROM</span> enterprise_memory.telco_connections
+    <span class="sql-keyword">WHERE</span> from_element = {entity:String}
+)
+<span class="sql-keyword">AND</span> {max_hops:UInt32} &gt;= <span class="sql-number">2</span></code></pre>
+      </div>
+
+      <div class="step-section step-grid">
+        <div class="step-precision">
+          <h4>Precision signature</h4>
+          <ul><li><span class="k">Rows read</span><span class="v highlight">57</span></li><li><span class="k">Bytes read</span><span class="v">2.2 KB</span></li><li><span class="k">Rows returned</span><span class="v">7</span></li><li><span class="k">Selectivity</span><span class="v highlight">12.28%</span></li><li><span class="k">Filter</span><span class="v">start entity: core-router-01</span></li><li><span class="k">Filter</span><span class="v">max_hops=2</span></li><li><span class="k">Filter</span><span class="v">JOIN on service_id / element_id / asset_id (indexed PKs)</span></li><li><span class="k">Index hint</span><span class="v">MergeTree PK JOINs + UNION ALL over 1-hop and 2-hop branches</span></li></ul>
+        </div>
+        <div>
+          <h4>Result</h4>
+          <div class="step-insight"><p>Downstream topology: 5 direct + 2 indirect elements. This is what loses service if the fault escalates.</p></div>
+        </div>
+      </div>
+    </article>
+    
+    </div>
+  </section>
+
+  
+    <section class="brief">
+      <div class="page">
+        <div class="brief-card">
+          <h2>Final brief</h2>
+          <ul><li><b>Affected element:</b> core-router-01 (status: up)</li><li><b>Topology impact:</b> 5 direct + 2 indirect downstream</li><li><b>Top historical match:</b> Core router line card failure causing 30% traffic loss on backbone (cosineDistance 0.2024)</li><li><b>Case id:</b> FAULT-1776596706</li></ul>
+          <div class="recommended"><strong>Recommended.</strong> Reapply the past resolution from the fetch_record step. If the fault cannot be hot-fixed, pre-reroute traffic away from the direct downstream elements in Step 5 before customer impact. Re-scan in 5 minutes to confirm health restored.</div>
+        </div>
+      </div>
+    </section>
+    
+
+  <footer>
+    Generated by cookbooks/report/generate.py -- ClickHouse 26.3 · HNSW vector_similarity · SQL JOINs
+  </footer>
+</body>
+</html>
