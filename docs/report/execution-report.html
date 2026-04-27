@@ -175,7 +175,7 @@
   <div class="container">
     <h1>Enterprise Agent Memory — Execution Report</h1>
     <p class="subtitle">Every query, every scenario, every row. Generated against the live cluster.</p>
-    <div class="meta"><strong>Generated at:</strong> 2026-04-23T07:29:27+00:00<br><strong>ClickHouse version:</strong> 26.3.9.8<br><strong>ClickHouse endpoint:</strong> http://localhost:18123<br><strong>Database:</strong> enterprise_memory<br><strong>Iterations per query (client):</strong> 10<br><strong>Query vector source:</strong> real 768-d embedding from obs_historical_incidents (768 dims)<br><strong>Graph tier backend:</strong> ClickHouse SQL self-JOIN + UNION ALL on MergeTree edge tables</div>
+    <div class="meta"><strong>Generated at:</strong> 2026-04-27T05:25:09+00:00<br><strong>ClickHouse version:</strong> 26.3.9.8<br><strong>ClickHouse endpoint:</strong> http://localhost:18123<br><strong>Database:</strong> enterprise_memory<br><strong>Iterations per query (client):</strong> 10<br><strong>Query vector source:</strong> real 768-d embedding from obs_historical_incidents (768 dims)<br><strong>Graph tier backend:</strong> ClickHouse SQL self-JOIN + UNION ALL on MergeTree edge tables</div>
     
     <article class="scenario data-section">
       <h2 class="scenario-title">Data under test</h2>
@@ -183,7 +183,7 @@
 
       <div class="scenario-totals">
         <span><strong>Tables:</strong> 21</span>
-        <span><strong>Total rows:</strong> 372</span>
+        <span><strong>Total rows:</strong> 986</span>
         <span><strong>Domains:</strong> observability, cybersecurity, telco, conversation</span>
         <span><strong>Embeddings:</strong> Gemini <code>gemini-embedding-001</code>, 768-dim <code>Array(Float32)</code></span>
       </div>
@@ -199,6 +199,15 @@
           <tbody>
             
           <tr>
+            <td><span class="tier tier-warm">WARM</span></td>
+            <td><code>agent_memory_long</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">201</td>
+            <td style="text-align:right;">11</td>
+            <td class="purpose">Long-term agent memory (conversations, facts). HNSW on embedding.</td>
+          </tr>
+        
+          <tr>
             <td><span class="tier tier-hot">HOT</span></td>
             <td><code>obs_events_stream</code></td>
             <td>Memory</td>
@@ -208,12 +217,39 @@
           </tr>
         
           <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>agent_memory_hot</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">185</td>
+            <td style="text-align:right;">7</td>
+            <td class="purpose">Cross-agent working memory (conversation scratchpad).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>obs_incident_workspace</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">181</td>
+            <td style="text-align:right;">11</td>
+            <td class="purpose">Per-investigation scratchpad (created by open_investigation).</td>
+          </tr>
+        
+          <tr>
             <td><span class="tier tier-util">UTIL</span></td>
             <td><code>benchmark_writes</code></td>
             <td>MergeTree</td>
             <td style="text-align:right;">55</td>
             <td style="text-align:right;">11</td>
             <td class="purpose">Dedicated sink for save_memory benchmark runs.</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-warm">WARM</span></td>
+            <td><code>knowledge_base</code></td>
+            <td>MergeTree</td>
+            <td style="text-align:right;">30</td>
+            <td style="text-align:right;">9</td>
+            <td class="purpose">Generic knowledge base for RAG (768-d embedding).</td>
           </tr>
         
           <tr>
@@ -232,6 +268,15 @@
             <td style="text-align:right;">12</td>
             <td style="text-align:right;">8</td>
             <td class="purpose">Telco network elements (vertex).</td>
+          </tr>
+        
+          <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>telco_fault_workspace</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">12</td>
+            <td style="text-align:right;">8</td>
+            <td class="purpose">Per-fault-ticket scratchpad.</td>
           </tr>
         
           <tr>
@@ -316,6 +361,15 @@
           </tr>
         
           <tr>
+            <td><span class="tier tier-hot">HOT</span></td>
+            <td><code>sec_case_workspace</code></td>
+            <td>Memory</td>
+            <td style="text-align:right;">5</td>
+            <td style="text-align:right;">11</td>
+            <td class="purpose">Per-security-case scratchpad.</td>
+          </tr>
+        
+          <tr>
             <td><span class="tier tier-warm">WARM</span></td>
             <td><code>sec_historical_incidents</code></td>
             <td>MergeTree</td>
@@ -333,60 +387,6 @@
             <td class="purpose">Threat intel indicators with 768-d embedding.</td>
           </tr>
         
-          <tr>
-            <td><span class="tier tier-hot">HOT</span></td>
-            <td><code>agent_memory_hot</code></td>
-            <td>Memory</td>
-            <td style="text-align:right;">0</td>
-            <td style="text-align:right;">7</td>
-            <td class="purpose">Cross-agent working memory (conversation scratchpad).</td>
-          </tr>
-        
-          <tr>
-            <td><span class="tier tier-warm">WARM</span></td>
-            <td><code>agent_memory_long</code></td>
-            <td>MergeTree</td>
-            <td style="text-align:right;">0</td>
-            <td style="text-align:right;">11</td>
-            <td class="purpose">Long-term agent memory (conversations, facts). HNSW on embedding.</td>
-          </tr>
-        
-          <tr>
-            <td><span class="tier tier-warm">WARM</span></td>
-            <td><code>knowledge_base</code></td>
-            <td>MergeTree</td>
-            <td style="text-align:right;">0</td>
-            <td style="text-align:right;">9</td>
-            <td class="purpose">Generic knowledge base for RAG (768-d embedding).</td>
-          </tr>
-        
-          <tr>
-            <td><span class="tier tier-hot">HOT</span></td>
-            <td><code>obs_incident_workspace</code></td>
-            <td>Memory</td>
-            <td style="text-align:right;">0</td>
-            <td style="text-align:right;">11</td>
-            <td class="purpose">Per-investigation scratchpad (created by open_investigation).</td>
-          </tr>
-        
-          <tr>
-            <td><span class="tier tier-hot">HOT</span></td>
-            <td><code>sec_case_workspace</code></td>
-            <td>Memory</td>
-            <td style="text-align:right;">0</td>
-            <td style="text-align:right;">11</td>
-            <td class="purpose">Per-security-case scratchpad.</td>
-          </tr>
-        
-          <tr>
-            <td><span class="tier tier-hot">HOT</span></td>
-            <td><code>telco_fault_workspace</code></td>
-            <td>Memory</td>
-            <td style="text-align:right;">0</td>
-            <td style="text-align:right;">8</td>
-            <td class="purpose">Per-fault-ticket scratchpad.</td>
-          </tr>
-        
           </tbody>
         </table>
       </div>
@@ -396,7 +396,7 @@
         <li><strong>Time series (HOT).</strong> <code>ENGINE = Memory</code> for sub-5ms tail reads on live event streams. Volatile — cleared on container restart, which is the desired behavior for a live stream.</li>
         <li><strong>Append-only history with vectors (WARM).</strong> <code>ENGINE = MergeTree</code> with <code>INDEX ... TYPE vector_similarity('hnsw', 'cosineDistance', 768)</code> inside the table. Every historical-incident row carries a 768-dim Gemini embedding of its title + description + root cause, so semantic search is filter-first + HNSW-ranked in one SQL statement.</li>
         <li><strong>Small relational (GRAPH).</strong> Service catalogs and dependency edges as plain MergeTree tables. 2-hop blast radius is a self-JOIN + UNION ALL, one branch per hop depth. Same SQL engine as HOT and WARM, no separate graph store.</li>
-        <li><strong>Conversation memory.</strong> <code>agent_memory_hot</code> (Memory engine, last N turns) and <code>agent_memory_long</code> (MergeTree + HNSW, 768-d) persist cross-agent context. Every save_memory call is an INSERT against these.</li>
+        <li><strong>Conversation memory.</strong> <code>agent_memory_hot</code> (Memory engine, last N turns) and <code>agent_memory_long</code> (MergeTree + HNSW, 768-d) persist cross-agent memory. Every save_memory call is an INSERT against these.</li>
       </ul>
 
       <h3 class="sub-head">Data model</h3>
@@ -409,6 +409,30 @@ each scenario is the SQL the server runs.</pre>
       <h3 class="sub-head">DDL — click to expand</h3>
       <div class="ddls">
         
+          <details>
+            <summary><span class="tier tier-warm">WARM</span> <code>agent_memory_long</code> — 201 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.agent_memory_long
+(
+    `memory_id` UUID DEFAULT generateUUIDv4(),
+    `user_id` String,
+    `agent_id` LowCardinality(String) DEFAULT &#x27;&#x27;,
+    `session_id` String,
+    `turn_id` UInt32 DEFAULT 0,
+    `role` LowCardinality(String) DEFAULT &#x27;assistant&#x27;,
+    `content` String,
+    `content_embedding` Array(Float32),
+    `memory_type` LowCardinality(String) DEFAULT &#x27;episodic&#x27;,
+    `importance` Float32 DEFAULT 0.5,
+    `ts` DateTime64(3) DEFAULT now64(),
+    INDEX embedding_idx content_embedding TYPE vector_similarity(&#x27;hnsw&#x27;, &#x27;cosineDistance&#x27;, 768) GRANULARITY 1000
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (user_id, ts, session_id)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
           <details>
             <summary><span class="tier tier-hot">HOT</span> <code>obs_events_stream</code> — 200 rows · Memory</summary>
             <pre class="code">CREATE TABLE enterprise_memory.obs_events_stream
@@ -425,6 +449,42 @@ each scenario is the SQL the server runs.</pre>
     `error_code` Nullable(String),
     `region` String,
     `env` String
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>agent_memory_hot</code> — 185 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.agent_memory_hot
+(
+    `session_id` String,
+    `turn_id` UInt32,
+    `role` LowCardinality(String),
+    `content` String,
+    `tool_name` LowCardinality(String) DEFAULT &#x27;&#x27;,
+    `metadata` String DEFAULT &#x27;&#x27;,
+    `ts` DateTime64(3) DEFAULT now64()
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>obs_incident_workspace</code> — 181 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.obs_incident_workspace
+(
+    `incident_id` String,
+    `event_id` UUID,
+    `ts` DateTime64(3),
+    `service` String,
+    `host` String,
+    `level` String,
+    `message` String,
+    `trace_id` String,
+    `latency_ms` Float32,
+    `error_code` Nullable(String),
+    `added_at` DateTime64(3) DEFAULT now64()
 )
 ENGINE = Memory</pre>
           </details>
@@ -450,6 +510,27 @@ ENGINE = Memory</pre>
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(ts)
 ORDER BY (user_id, ts, session_id)
+SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-warm">WARM</span> <code>knowledge_base</code> — 30 rows · MergeTree</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.knowledge_base
+(
+    `article_id` UUID DEFAULT generateUUIDv4(),
+    `title` String,
+    `content` String,
+    `content_embedding` Array(Float32),
+    `category` LowCardinality(String) DEFAULT &#x27;general&#x27;,
+    `tags` Array(String) DEFAULT [],
+    `created_at` DateTime64(3) DEFAULT now64(),
+    `updated_at` DateTime64(3) DEFAULT now64(),
+    `access_count` UInt32 DEFAULT 0,
+    INDEX embedding_idx content_embedding TYPE vector_similarity(&#x27;hnsw&#x27;, &#x27;cosineDistance&#x27;, 768) GRANULARITY 1000
+)
+ENGINE = MergeTree
+ORDER BY (category, article_id)
 SETTINGS index_granularity = 8192</pre>
           </details>
         
@@ -485,6 +566,23 @@ SETTINGS index_granularity = 8192</pre>
 ENGINE = MergeTree
 ORDER BY element_id
 SETTINGS index_granularity = 8192</pre>
+          </details>
+        
+
+          <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>telco_fault_workspace</code> — 12 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.telco_fault_workspace
+(
+    `fault_id` String,
+    `element_id` String,
+    `ts` DateTime64(3),
+    `metric` String,
+    `value` Float32,
+    `threshold` Float32,
+    `severity` String,
+    `added_at` DateTime64(3) DEFAULT now64()
+)
+ENGINE = Memory</pre>
           </details>
         
 
@@ -659,6 +757,26 @@ SETTINGS index_granularity = 8192</pre>
         
 
           <details>
+            <summary><span class="tier tier-hot">HOT</span> <code>sec_case_workspace</code> — 5 rows · Memory</summary>
+            <pre class="code">CREATE TABLE enterprise_memory.sec_case_workspace
+(
+    `case_id` String,
+    `event_id` UUID,
+    `ts` DateTime64(3),
+    `event_type` String,
+    `user_id` String,
+    `asset_id` String,
+    `src_ip` String,
+    `action` String,
+    `outcome` String,
+    `severity` String,
+    `added_at` DateTime64(3) DEFAULT now64()
+)
+ENGINE = Memory</pre>
+          </details>
+        
+
+          <details>
             <summary><span class="tier tier-warm">WARM</span> <code>sec_historical_incidents</code> — 5 rows · MergeTree</summary>
             <pre class="code">CREATE TABLE enterprise_memory.sec_historical_incidents
 (
@@ -707,124 +825,6 @@ ORDER BY (indicator_type, confidence)
 SETTINGS index_granularity = 8192</pre>
           </details>
         
-
-          <details>
-            <summary><span class="tier tier-hot">HOT</span> <code>agent_memory_hot</code> — 0 rows · Memory</summary>
-            <pre class="code">CREATE TABLE enterprise_memory.agent_memory_hot
-(
-    `session_id` String,
-    `turn_id` UInt32,
-    `role` LowCardinality(String),
-    `content` String,
-    `tool_name` LowCardinality(String) DEFAULT &#x27;&#x27;,
-    `metadata` String DEFAULT &#x27;&#x27;,
-    `ts` DateTime64(3) DEFAULT now64()
-)
-ENGINE = Memory</pre>
-          </details>
-        
-
-          <details>
-            <summary><span class="tier tier-warm">WARM</span> <code>agent_memory_long</code> — 0 rows · MergeTree</summary>
-            <pre class="code">CREATE TABLE enterprise_memory.agent_memory_long
-(
-    `memory_id` UUID DEFAULT generateUUIDv4(),
-    `user_id` String,
-    `agent_id` LowCardinality(String) DEFAULT &#x27;&#x27;,
-    `session_id` String,
-    `turn_id` UInt32 DEFAULT 0,
-    `role` LowCardinality(String) DEFAULT &#x27;assistant&#x27;,
-    `content` String,
-    `content_embedding` Array(Float32),
-    `memory_type` LowCardinality(String) DEFAULT &#x27;episodic&#x27;,
-    `importance` Float32 DEFAULT 0.5,
-    `ts` DateTime64(3) DEFAULT now64(),
-    INDEX embedding_idx content_embedding TYPE vector_similarity(&#x27;hnsw&#x27;, &#x27;cosineDistance&#x27;, 768) GRANULARITY 1000
-)
-ENGINE = MergeTree
-PARTITION BY toYYYYMM(ts)
-ORDER BY (user_id, ts, session_id)
-SETTINGS index_granularity = 8192</pre>
-          </details>
-        
-
-          <details>
-            <summary><span class="tier tier-warm">WARM</span> <code>knowledge_base</code> — 0 rows · MergeTree</summary>
-            <pre class="code">CREATE TABLE enterprise_memory.knowledge_base
-(
-    `article_id` UUID DEFAULT generateUUIDv4(),
-    `title` String,
-    `content` String,
-    `content_embedding` Array(Float32),
-    `category` LowCardinality(String) DEFAULT &#x27;general&#x27;,
-    `tags` Array(String) DEFAULT [],
-    `created_at` DateTime64(3) DEFAULT now64(),
-    `updated_at` DateTime64(3) DEFAULT now64(),
-    `access_count` UInt32 DEFAULT 0,
-    INDEX embedding_idx content_embedding TYPE vector_similarity(&#x27;hnsw&#x27;, &#x27;cosineDistance&#x27;, 768) GRANULARITY 1000
-)
-ENGINE = MergeTree
-ORDER BY (category, article_id)
-SETTINGS index_granularity = 8192</pre>
-          </details>
-        
-
-          <details>
-            <summary><span class="tier tier-hot">HOT</span> <code>obs_incident_workspace</code> — 0 rows · Memory</summary>
-            <pre class="code">CREATE TABLE enterprise_memory.obs_incident_workspace
-(
-    `incident_id` String,
-    `event_id` UUID,
-    `ts` DateTime64(3),
-    `service` String,
-    `host` String,
-    `level` String,
-    `message` String,
-    `trace_id` String,
-    `latency_ms` Float32,
-    `error_code` Nullable(String),
-    `added_at` DateTime64(3) DEFAULT now64()
-)
-ENGINE = Memory</pre>
-          </details>
-        
-
-          <details>
-            <summary><span class="tier tier-hot">HOT</span> <code>sec_case_workspace</code> — 0 rows · Memory</summary>
-            <pre class="code">CREATE TABLE enterprise_memory.sec_case_workspace
-(
-    `case_id` String,
-    `event_id` UUID,
-    `ts` DateTime64(3),
-    `event_type` String,
-    `user_id` String,
-    `asset_id` String,
-    `src_ip` String,
-    `action` String,
-    `outcome` String,
-    `severity` String,
-    `added_at` DateTime64(3) DEFAULT now64()
-)
-ENGINE = Memory</pre>
-          </details>
-        
-
-          <details>
-            <summary><span class="tier tier-hot">HOT</span> <code>telco_fault_workspace</code> — 0 rows · Memory</summary>
-            <pre class="code">CREATE TABLE enterprise_memory.telco_fault_workspace
-(
-    `fault_id` String,
-    `element_id` String,
-    `ts` DateTime64(3),
-    `metric` String,
-    `value` Float32,
-    `threshold` Float32,
-    `severity` String,
-    `added_at` DateTime64(3) DEFAULT now64()
-)
-ENGINE = Memory</pre>
-          </details>
-        
       </div>
     </article>
     
@@ -862,10 +862,10 @@ ENGINE = Memory</pre>
           </thead>
           <tbody>
             <tr>
-              <td>2.27 ms</td>
-              <td>20.0 ms</td>
-              <td>20.0 ms</td>
-              <td>27.5 KB</td><td>200</td><td>1 ms</td><td>5.27 MB</td>
+              <td>2.33 ms</td>
+              <td>7.23 ms</td>
+              <td>7.23 ms</td>
+              <td>27.5 KB</td><td>200</td><td>1 ms</td><td>4.27 MB</td>
             </tr>
           </tbody>
         </table>
@@ -900,31 +900,8 @@ ENGINE = Memory</pre>
       </details>
 
       <details open>
-        <summary>Result — 2 rows returned (first 20 shown)</summary>
-        <pre class="code">[
-  {
-    &quot;event_id&quot;: &quot;3e288438-d3d8-4bbd-807a-c339482f7b89&quot;,
-    &quot;ts&quot;: &quot;2026-04-23 07:24:37.729&quot;,
-    &quot;service&quot;: &quot;svc-orders&quot;,
-    &quot;host&quot;: &quot;svc-orders-pod-2&quot;,
-    &quot;level&quot;: &quot;ERROR&quot;,
-    &quot;message&quot;: &quot;TLS handshake failed: certificate expired&quot;,
-    &quot;latency_ms&quot;: 314.11563,
-    &quot;error_code&quot;: &quot;CONN_REFUSED&quot;,
-    &quot;trace_id&quot;: &quot;trace-39693&quot;
-  },
-  {
-    &quot;event_id&quot;: &quot;640b385f-6d53-4393-b2df-ec06aa332982&quot;,
-    &quot;ts&quot;: &quot;2026-04-23 07:24:37.728&quot;,
-    &quot;service&quot;: &quot;svc-orders&quot;,
-    &quot;host&quot;: &quot;svc-orders-pod-1&quot;,
-    &quot;level&quot;: &quot;ERROR&quot;,
-    &quot;message&quot;: &quot;Deadlock detected in transaction&quot;,
-    &quot;latency_ms&quot;: 1219.699,
-    &quot;error_code&quot;: &quot;DB_TIMEOUT&quot;,
-    &quot;trace_id&quot;: &quot;trace-13783&quot;
-  }
-]</pre>
+        <summary>Result — 0 rows returned (first 20 shown)</summary>
+        <pre class="code">[]</pre>
       </details>
     </section>
     
@@ -939,7 +916,7 @@ ENGINE = Memory</pre>
         <span><strong>Tools called:</strong> 1</span>
         <span><strong>Total rows read:</strong> 14</span>
         <span><strong>Total bytes read:</strong> 25.8 KB</span>
-        <span><strong>Sum client p50:</strong> 5.7 ms</span>
+        <span><strong>Sum client p50:</strong> 5.9 ms</span>
       </div>
       
     <section class="step">
@@ -964,10 +941,10 @@ ENGINE = Memory</pre>
           </thead>
           <tbody>
             <tr>
-              <td>5.72 ms</td>
-              <td>29.5 ms</td>
-              <td>29.5 ms</td>
-              <td>25.8 KB</td><td>14</td><td>4 ms</td><td>6.17 MB</td>
+              <td>5.89 ms</td>
+              <td>10.73 ms</td>
+              <td>10.73 ms</td>
+              <td>25.8 KB</td><td>14</td><td>9 ms</td><td>6.22 MB</td>
             </tr>
           </tbody>
         </table>
@@ -1009,8 +986,8 @@ ENGINE = Memory</pre>
         <summary>Result — 5 rows returned (first 20 shown)</summary>
         <pre class="code">[
   {
-    &quot;incident_id&quot;: &quot;3bac012b-bd05-401c-9ece-504404eeaaef&quot;,
-    &quot;ts&quot;: &quot;2025-10-26 03:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;453bbaff-5bef-4774-92c4-4ba9b1b73639&quot;,
+    &quot;ts&quot;: &quot;2025-10-30 01:07:13.335&quot;,
     &quot;title&quot;: &quot;Payment service database connection pool exhaustion&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-payments&quot;,
@@ -1023,8 +1000,8 @@ ENGINE = Memory</pre>
     &quot;similarity_distance&quot;: 0
   },
   {
-    &quot;incident_id&quot;: &quot;994e3a59-2580-49c9-9a6c-478b72413079&quot;,
-    &quot;ts&quot;: &quot;2026-03-28 11:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;7e753ea8-a2ec-43ed-8eaf-5305243c770d&quot;,
+    &quot;ts&quot;: &quot;2026-04-01 09:07:13.335&quot;,
     &quot;title&quot;: &quot;Payment service TLS certificate expiry causing 503s&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-payments&quot;,
@@ -1037,8 +1014,8 @@ ENGINE = Memory</pre>
     &quot;similarity_distance&quot;: 0.2783
   },
   {
-    &quot;incident_id&quot;: &quot;8a49a5ee-dc33-41b8-ae70-c5d76ed56193&quot;,
-    &quot;ts&quot;: &quot;2025-12-31 06:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;cf825b3b-f076-4357-8988-a917917cf8a3&quot;,
+    &quot;ts&quot;: &quot;2026-01-04 04:07:13.335&quot;,
     &quot;title&quot;: &quot;Inventory service deadlock during flash sale&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-inventory&quot;,
@@ -1051,8 +1028,8 @@ ENGINE = Memory</pre>
     &quot;similarity_distance&quot;: 0.2933
   },
   {
-    &quot;incident_id&quot;: &quot;6b1769d0-699d-4b74-91b4-cabc8afa819f&quot;,
-    &quot;ts&quot;: &quot;2025-12-08 07:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;7dd07b2e-572f-4f42-8ac8-c1953fe9fc09&quot;,
+    &quot;ts&quot;: &quot;2025-12-12 05:07:13.335&quot;,
     &quot;title&quot;: &quot;Search service memory leak causing OOM restarts&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-search&quot;,
@@ -1065,8 +1042,8 @@ ENGINE = Memory</pre>
     &quot;similarity_distance&quot;: 0.3372
   },
   {
-    &quot;incident_id&quot;: &quot;3113be19-f79d-461d-816b-b73978316a43&quot;,
-    &quot;ts&quot;: &quot;2025-11-16 10:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;bb669191-f178-448e-9288-217cccaf46c8&quot;,
+    &quot;ts&quot;: &quot;2025-11-20 08:07:13.335&quot;,
     &quot;title&quot;: &quot;Auth service JWT validation latency spike&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-auth&quot;,
@@ -1094,7 +1071,7 @@ ENGINE = Memory</pre>
         <span><strong>Tools called:</strong> 1</span>
         <span><strong>Total rows read:</strong> 32</span>
         <span><strong>Total bytes read:</strong> 922 B</span>
-        <span><strong>Sum client p50:</strong> 4.5 ms</span>
+        <span><strong>Sum client p50:</strong> 5.4 ms</span>
       </div>
       
     <section class="step">
@@ -1119,10 +1096,10 @@ ENGINE = Memory</pre>
           </thead>
           <tbody>
             <tr>
-              <td>4.53 ms</td>
-              <td>24.96 ms</td>
-              <td>24.96 ms</td>
-              <td>922 B</td><td>32</td><td>3 ms</td><td>5.57 MB</td>
+              <td>5.42 ms</td>
+              <td>8.17 ms</td>
+              <td>8.17 ms</td>
+              <td>922 B</td><td>32</td><td>3 ms</td><td>5.56 MB</td>
             </tr>
           </tbody>
         </table>
@@ -1207,9 +1184,9 @@ ENGINE = Memory</pre>
       <p class="anticipated"><strong>Answer shape:</strong> Live errors + similar past incident + hydrated runbook + blast radius, in one turn.</p>
       <div class="scenario-totals">
         <span><strong>Tools called:</strong> 4</span>
-        <span><strong>Total rows read:</strong> 248</span>
-        <span><strong>Total bytes read:</strong> 54.7 KB</span>
-        <span><strong>Sum client p50:</strong> 15.5 ms</span>
+        <span><strong>Total rows read:</strong> 247</span>
+        <span><strong>Total bytes read:</strong> 54.5 KB</span>
+        <span><strong>Sum client p50:</strong> 16.9 ms</span>
       </div>
       
     <section class="step">
@@ -1234,10 +1211,10 @@ ENGINE = Memory</pre>
           </thead>
           <tbody>
             <tr>
-              <td>2.38 ms</td>
-              <td>2.74 ms</td>
-              <td>2.74 ms</td>
-              <td>27.5 KB</td><td>200</td><td>1 ms</td><td>5.27 MB</td>
+              <td>3.41 ms</td>
+              <td>7.12 ms</td>
+              <td>7.12 ms</td>
+              <td>27.5 KB</td><td>200</td><td>1 ms</td><td>4.27 MB</td>
             </tr>
           </tbody>
         </table>
@@ -1272,31 +1249,8 @@ ENGINE = Memory</pre>
       </details>
 
       <details open>
-        <summary>Result — 2 rows returned (first 20 shown)</summary>
-        <pre class="code">[
-  {
-    &quot;event_id&quot;: &quot;3e288438-d3d8-4bbd-807a-c339482f7b89&quot;,
-    &quot;ts&quot;: &quot;2026-04-23 07:24:37.729&quot;,
-    &quot;service&quot;: &quot;svc-orders&quot;,
-    &quot;host&quot;: &quot;svc-orders-pod-2&quot;,
-    &quot;level&quot;: &quot;ERROR&quot;,
-    &quot;message&quot;: &quot;TLS handshake failed: certificate expired&quot;,
-    &quot;latency_ms&quot;: 314.11563,
-    &quot;error_code&quot;: &quot;CONN_REFUSED&quot;,
-    &quot;trace_id&quot;: &quot;trace-39693&quot;
-  },
-  {
-    &quot;event_id&quot;: &quot;640b385f-6d53-4393-b2df-ec06aa332982&quot;,
-    &quot;ts&quot;: &quot;2026-04-23 07:24:37.728&quot;,
-    &quot;service&quot;: &quot;svc-orders&quot;,
-    &quot;host&quot;: &quot;svc-orders-pod-1&quot;,
-    &quot;level&quot;: &quot;ERROR&quot;,
-    &quot;message&quot;: &quot;Deadlock detected in transaction&quot;,
-    &quot;latency_ms&quot;: 1219.699,
-    &quot;error_code&quot;: &quot;DB_TIMEOUT&quot;,
-    &quot;trace_id&quot;: &quot;trace-13783&quot;
-  }
-]</pre>
+        <summary>Result — 0 rows returned (first 20 shown)</summary>
+        <pre class="code">[]</pre>
       </details>
     </section>
     
@@ -1323,10 +1277,10 @@ ENGINE = Memory</pre>
           </thead>
           <tbody>
             <tr>
-              <td>6.78 ms</td>
-              <td>20.73 ms</td>
-              <td>20.73 ms</td>
-              <td>25.8 KB</td><td>14</td><td>3 ms</td><td>6.18 MB</td>
+              <td>5.57 ms</td>
+              <td>6.21 ms</td>
+              <td>6.21 ms</td>
+              <td>25.8 KB</td><td>14</td><td>4 ms</td><td>6.22 MB</td>
             </tr>
           </tbody>
         </table>
@@ -1368,8 +1322,8 @@ ENGINE = Memory</pre>
         <summary>Result — 5 rows returned (first 20 shown)</summary>
         <pre class="code">[
   {
-    &quot;incident_id&quot;: &quot;3bac012b-bd05-401c-9ece-504404eeaaef&quot;,
-    &quot;ts&quot;: &quot;2025-10-26 03:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;453bbaff-5bef-4774-92c4-4ba9b1b73639&quot;,
+    &quot;ts&quot;: &quot;2025-10-30 01:07:13.335&quot;,
     &quot;title&quot;: &quot;Payment service database connection pool exhaustion&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-payments&quot;,
@@ -1382,8 +1336,8 @@ ENGINE = Memory</pre>
     &quot;similarity_distance&quot;: 0
   },
   {
-    &quot;incident_id&quot;: &quot;994e3a59-2580-49c9-9a6c-478b72413079&quot;,
-    &quot;ts&quot;: &quot;2026-03-28 11:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;7e753ea8-a2ec-43ed-8eaf-5305243c770d&quot;,
+    &quot;ts&quot;: &quot;2026-04-01 09:07:13.335&quot;,
     &quot;title&quot;: &quot;Payment service TLS certificate expiry causing 503s&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-payments&quot;,
@@ -1396,8 +1350,8 @@ ENGINE = Memory</pre>
     &quot;similarity_distance&quot;: 0.2783
   },
   {
-    &quot;incident_id&quot;: &quot;8a49a5ee-dc33-41b8-ae70-c5d76ed56193&quot;,
-    &quot;ts&quot;: &quot;2025-12-31 06:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;cf825b3b-f076-4357-8988-a917917cf8a3&quot;,
+    &quot;ts&quot;: &quot;2026-01-04 04:07:13.335&quot;,
     &quot;title&quot;: &quot;Inventory service deadlock during flash sale&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-inventory&quot;,
@@ -1410,8 +1364,8 @@ ENGINE = Memory</pre>
     &quot;similarity_distance&quot;: 0.2933
   },
   {
-    &quot;incident_id&quot;: &quot;6b1769d0-699d-4b74-91b4-cabc8afa819f&quot;,
-    &quot;ts&quot;: &quot;2025-12-08 07:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;7dd07b2e-572f-4f42-8ac8-c1953fe9fc09&quot;,
+    &quot;ts&quot;: &quot;2025-12-12 05:07:13.335&quot;,
     &quot;title&quot;: &quot;Search service memory leak causing OOM restarts&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-search&quot;,
@@ -1424,8 +1378,8 @@ ENGINE = Memory</pre>
     &quot;similarity_distance&quot;: 0.3372
   },
   {
-    &quot;incident_id&quot;: &quot;3113be19-f79d-461d-816b-b73978316a43&quot;,
-    &quot;ts&quot;: &quot;2025-11-16 10:28:40.854&quot;,
+    &quot;incident_id&quot;: &quot;bb669191-f178-448e-9288-217cccaf46c8&quot;,
+    &quot;ts&quot;: &quot;2025-11-20 08:07:13.335&quot;,
     &quot;title&quot;: &quot;Auth service JWT validation latency spike&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-auth&quot;,
@@ -1465,10 +1419,10 @@ ENGINE = Memory</pre>
           </thead>
           <tbody>
             <tr>
-              <td>2.11 ms</td>
-              <td>3.09 ms</td>
-              <td>3.09 ms</td>
-              <td>525 B</td><td>2</td><td>0 ms</td><td>5.18 MB</td>
+              <td>2.86 ms</td>
+              <td>5.02 ms</td>
+              <td>5.02 ms</td>
+              <td>283 B</td><td>1</td><td>2 ms</td><td>5.18 MB</td>
             </tr>
           </tbody>
         </table>
@@ -1489,7 +1443,7 @@ ENGINE = Memory</pre>
       <details open>
         <summary>Bind parameters</summary>
         <pre class="code">{
-  &quot;identifier&quot;: &quot;994e3a59-2580-49c9-9a6c-478b72413079&quot;
+  &quot;identifier&quot;: &quot;453bbaff-5bef-4774-92c4-4ba9b1b73639&quot;
 }</pre>
       </details>
 
@@ -1497,11 +1451,11 @@ ENGINE = Memory</pre>
         <summary>Result — 1 rows returned (first 20 shown)</summary>
         <pre class="code">[
   {
-    &quot;incident_id&quot;: &quot;994e3a59-2580-49c9-9a6c-478b72413079&quot;,
-    &quot;title&quot;: &quot;Payment service TLS certificate expiry causing 503s&quot;,
-    &quot;root_cause&quot;: &quot;Certificate renewal automation failed silently 30 days prior; no alerting on expiry&quot;,
-    &quot;resolution&quot;: &quot;Renewed certificate, implemented cert-manager with 30-day pre-expiry alerts&quot;,
-    &quot;duration_min&quot;: 8,
+    &quot;incident_id&quot;: &quot;453bbaff-5bef-4774-92c4-4ba9b1b73639&quot;,
+    &quot;title&quot;: &quot;Payment service database connection pool exhaustion&quot;,
+    &quot;root_cause&quot;: &quot;Database connection pool limit set too low; connection leak in payment retry logic&quot;,
+    &quot;resolution&quot;: &quot;Increased pool size from 50 to 200, fixed connection leak, added circuit breaker&quot;,
+    &quot;duration_min&quot;: 45,
     &quot;severity&quot;: &quot;P1&quot;,
     &quot;affected_services&quot;: [
       &quot;svc-payments&quot;,
@@ -1535,10 +1489,10 @@ ENGINE = Memory</pre>
           </thead>
           <tbody>
             <tr>
-              <td>4.24 ms</td>
-              <td>6.51 ms</td>
-              <td>6.51 ms</td>
-              <td>922 B</td><td>32</td><td>3 ms</td><td>5.56 MB</td>
+              <td>5.1 ms</td>
+              <td>7.93 ms</td>
+              <td>7.93 ms</td>
+              <td>922 B</td><td>32</td><td>6 ms</td><td>5.57 MB</td>
             </tr>
           </tbody>
         </table>

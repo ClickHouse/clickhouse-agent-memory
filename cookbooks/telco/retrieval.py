@@ -81,7 +81,7 @@ def step1_scan_network_state(client, target_element: str = "core-router-01") -> 
             "alert_level": "HIGH",
         }
 
-    print_insight("Target element status", f"{target['status'].upper()} -- CPU: {target['cpu_pct']}%, Error Rate: {target['error_rate']}")
+    print_insight("Target element status", f"{target['status'].upper()} -- CPU: {target['cpu_pct']}%, Error Rate: {float(target['error_rate']):.4f}")
     critical = [r for r in rows if r["alert_level"] in ("CRITICAL", "HIGH")]
     print_insight("Elements at risk", f"{len(critical)} of {len(rows)} elements need attention")
 
@@ -376,7 +376,7 @@ def step6_synthesise_context(
         "\n".join([
             f"[bold]Fault ID:[/bold]              {context['fault_id']}",
             f"[bold]Element:[/bold]               {context['element']['id']} ({context['element']['type']} / {context['element']['vendor']})",
-            f"[bold]Status:[/bold]                {context['element']['status'].upper()} -- CPU: {context['element']['cpu_pct']}%, Error Rate: {context['element']['error_rate']}",
+            f"[bold]Status:[/bold]                {context['element']['status'].upper()} -- CPU: {context['element']['cpu_pct']}%, Error Rate: {float(context['element']['error_rate']):.4f}",
             f"[bold]Downstream Impact:[/bold]     {context['impact']['downstream_elements']} elements, {context['impact']['base_stations_at_risk']} base stations",
             f"[bold]Redundant Paths:[/bold]       {context['impact']['redundant_paths_available']} alternate routes available",
             f"[bold]Similar Past Event:[/bold]    {context['historical_context']['top_match_type']} -- {str(context['historical_context'].get('top_match_root_cause', ''))[:80]}",

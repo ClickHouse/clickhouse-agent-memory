@@ -179,7 +179,7 @@ sequenceDiagram
     MCP->>CH: SELECT ts, service, host, level, message<br/>FROM obs_events_stream<br/>WHERE service='svc-orders'<br/>  AND ts >= now() - INTERVAL 60 MINUTE<br/>ORDER BY ts DESC LIMIT 200
     Note over CH: Memory engine:<br/>no disk, no merge,<br/>exact scan of recent rows
     CH-->>MCP: 200 rows, ~0.2 ms server time
-    MCP->>MCP: wrap in envelope:<br/>{tier, tier_engine, sql,<br/> latency_ms, rows_preview, insights}
+    MCP->>MCP: wrap in envelope:<br/>{tier, domain, operation, sql,<br/> latency_ms, row_count, rows_preview,<br/> precision, insights}
     MCP-->>Agent: typed JSON envelope
     Agent->>Agent: read summary + decide next tool
 ```
@@ -250,7 +250,7 @@ flowchart LR
     SKIP -.prunes granules.-> H1
     SKIP -.prunes granules.-> H2
 
-    H2 --> RESULT([Related services<br/>+ hop distance<br/>3-10 ms, ~40% fewer<br/>rows read vs no index])
+    H2 --> RESULT([Related services<br/>+ hop distance<br/>3-10 ms at demo scale<br/>granule pruning at production scale])
 
     style START fill:#faff00,stroke:#1a1a1a,color:#1a1a1a
     style TOOL fill:#6be07a,stroke:#1a1a1a,color:#1a1a1a
@@ -312,14 +312,14 @@ sequenceDiagram
     end
 
     A->>U: synthesized brief:<br/>what's happening, what's similar,<br/>what's downstream
-    Note over U,CH: 247 rows · 54.5 KB · 9 ms total<br/>one cluster, one auth, one bill
+    Note over U,CH: 245 rows · 54.0 KB · 6 ms total<br/>one cluster, one auth, one bill
 ```
 
 ---
 
 ## MCP tools
 
-The FastMCP server at `cookbooks/mcp_server/` exposes eight typed tools. Each returns the same envelope shape, `{tier, tier_engine, sql, latency_ms, rows_preview, insights}`, so the LLM sees identical structure across tiers.
+The FastMCP server at `cookbooks/mcp_server/` exposes eight typed tools. Each returns the same envelope shape, `{tier, domain, operation, sql, latency_ms, row_count, rows_preview, precision, insights}`, so the LLM sees identical structure across tiers. The `precision` block carries `rows_read`, `bytes_read`, `selectivity`, and `index_hint` so the LLM (and the reader) can audit how much data each tool actually touched.
 
 ```mermaid
 flowchart LR
@@ -405,16 +405,16 @@ flowchart TB
 | Demo            | Tool call                     | Rows | Bytes    | p50 latency |
 |-----------------|-------------------------------|------|----------|-------------|
 | 1 · HOT         | `search_events`               | 200  | 27.5 KB  | 1 ms        |
-| 2 · WARM        | `semantic_search` + `get_record` | 14 | 25.8 KB  | 5 ms        |
+| 2 · WARM        | `semantic_search`             | 14   | 25.8 KB  | 3 ms        |
 | 3 · GRAPH       | `find_related_entities`       | 32   | 0.9 KB   | 3 ms        |
-| 4 · MIXED       | all four tool calls           | 247  | 54.5 KB  | 9 ms total  |
+| 4 · MIXED       | all four tool calls           | 245  | 54.0 KB  | 6 ms total  |
 
 Full walk-through with the exact agent prompts, tool calls, and rendered envelopes: [`docs/demo-script.md`](docs/demo-script.md).
 
 ### Other presets
 
-- **Telco NetOps** · `make run-one COOKBOOK=telco` · anchor entity `cell-site-4A`
-- **Security SOC** · `make run-one COOKBOOK=cybersecurity` · anchor entity `user-ceo-laptop`
+- **Telco NetOps** · `make run-one COOKBOOK=telco` · anchor entity `core-router-01`
+- **Security SOC** · `make run-one COOKBOOK=cybersecurity` · anchor entity `user-008`
 
 Same three-tier pattern, different domain schema. All three share `cookbooks/shared/client.py` for the ClickHouse client, embedding, and tier-aware CLI formatting.
 

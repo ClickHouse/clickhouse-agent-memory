@@ -1,81 +1,85 @@
-# Benchmarks — reproducible agent-memory numbers
+# Benchmarks — reproducible storage-path numbers
 
-Every performance number in the deck, blog, and report is generated from this
-directory. If a number appears in marketing and does not trace back to a query
-file + a harness run here, it does not belong in marketing.
+Every performance number cited in the README, ARCHITECTURE doc, blog post, or
+slide deck is generated from this directory. If a number appears in marketing
+and does not trace back to a query file plus a harness run here, it does not
+belong in marketing.
+
+The harness measures the same ClickHouse cluster the cookbooks demo runs
+against — it is not a separate bench-scale rig. That keeps the numbers honest:
+what the agent actually queries is what we actually measure.
 
 ## What this measures
 
-Eight MCP tools, each backed by a single ClickHouse query. Per tool we capture:
+Eight MCP tool queries (one SQL file per tool) replayed against a live
+ClickHouse 26.3 cluster. Per query we capture:
 
-- `read_rows` — rows the query touched (deterministic across runs)
-- `read_bytes` — bytes read from storage (deterministic)
-- `query_duration_ms` — wall time from `system.query_log` (varies ±)
+- `read_rows` — rows the query actually touched (deterministic across runs)
+- `read_bytes` — bytes read from storage (deterministic per data version)
+- `query_duration_ms` — wall time from `system.query_log` (varies with CPU)
 - `result_rows` — rows returned to the caller
 
-We do NOT measure the LLM picking tools. That varies per model and per prompt.
+We do NOT measure the LLM picking tools. That varies per model and prompt.
 This harness isolates the storage path so the numbers are reproducible
 regardless of which agent is orchestrating on top.
+
+## Prerequisites
+
+The harness reuses the cookbook stack. Before running anything here, bring
+up and seed that stack from the project root:
+
+```bash
+make cli-up        # docker compose up clickhouse + demo-app
+make cli-seed      # populate 17 domain + 3 conversation memory tables
+```
+
+`benchmarks/Makefile` reads `CH_HTTP` (default `http://localhost:18123`),
+`CH_USER`, `CH_PASS`, `CH_DB` (default `enterprise_memory`). Override per-run
+or export from `cookbooks/.env`.
 
 ## Quick start
 
 ```bash
 cd benchmarks
-make up            # Start a dedicated CH 26.3 container on port 18124
-make seed          # Create schema, load 100k events + 5k incidents + graph edges
-make bench         # Run each of 8 tool queries × 50 iterations, write results/
-make report        # Pretty-print results/ vs baseline/results.reference.json
-make check         # Diff rows/bytes against baseline — fails on drift
-make down          # Tear down the container
+set -a; . ../cookbooks/.env; set +a   # picks up CLICKHOUSE_USER / _PASSWORD
+
+make check-cluster   # confirm the cluster is reachable + has rows
+make bench           # run each of 8 queries N times, capture system.query_log
+make report          # render results/latest.json into results/latest.md
+make diff            # compare latest run against baseline/results.reference.json
 ```
 
-On a fresh Apple Silicon laptop with 16GB RAM and Docker Desktop, expect:
+`ITERATIONS` defaults to 50 with 5 warmup iterations. Override:
 
-- `make up` — 30s (image pull first time, 5s after)
-- `make seed` — 2–4 min (Gemini embeddings are cached in `seed/.embedding_cache/` after the first run, so reruns take 20s)
-- `make bench` — 15–25s (50 iterations × 8 queries)
-- `make report` — instant
+```bash
+make bench ITERATIONS=200 WARMUP=20
+```
 
-Total: under 5 minutes first time, under 1 minute on reruns.
+A full run on a warm Apple Silicon laptop: about 20 seconds end to end for
+default settings.
 
 ## Reproducibility guarantees
 
 | Metric | Deterministic? | Why |
 |---|---|---|
-| `read_rows` | **Yes, exact** | Comes from ClickHouse's query planner. No randomness. |
-| `read_bytes` | **Yes, exact** | Same source as rows. Compression is deterministic per data version. |
-| `query_duration_ms` | No, but bounded | Varies with CPU, thermals, disk cache. We report p50 and p95 over N runs. |
-| Embedding vectors | **Yes, for the same input** | Gemini is deterministic per (model, input). We pin model and cache to disk. |
-| Seed data | **Yes** | Fixed random seed (`SEED=42`), generated via `generateRandom()` + fixed prompts. |
+| `read_rows` | yes, exact | Comes from ClickHouse's query planner. No randomness. |
+| `read_bytes` | yes, exact | Same source. Compression deterministic per data version. |
+| `query_duration_ms` | no, but bounded | Varies with CPU, thermals, disk cache. We report p50 and p95 over N runs. |
+| Embedding vectors in seed | yes, per (model, input) | Gemini embeddings are deterministic; cookbook seeder caches by content hash. |
+| Seed data | yes, fixed seed | `cookbooks/shared/seeders/seed_all.py` uses `SEED=42` for every random draw. |
 
-The meaningful claim is on the deterministic metrics. When the deck says "448
-rows scanned," that number comes from `read_rows` and should match on every
-laptop. The 47ms latency will not match exactly — but the *rows scanned* proves
-the agent is not brute-forcing.
-
-## What you need
-
-- Docker Desktop with 4GB+ allocated
-- Python 3.11+
-- A Google Gemini API key set as `GOOGLE_API_KEY` (for embeddings). Free tier is
-  plenty for a single seed run (~105k embed calls, batched).
-- 500MB free disk for the CH volume + embedding cache.
-
-The embedding cache (`seed/.embedding_cache/*.json`) is gitignored but persists
-across `make seed` runs, so you pay the Gemini cost once.
+The deterministic metrics are the meaningful claim. When the deck or README
+cites a row count or byte count, it must match `make bench` exactly. Latencies
+will vary on different hardware — we report p50 and p95 over the iteration set
+so callers can compare order of magnitude.
 
 ## Directory layout
 
 ```
 benchmarks/
-├── README.md              (this file)
-├── Makefile               (reproducibility entry point)
-├── docker-compose.yml     (pinned CH 26.3 image, port 18124)
-├── seed/
-│   ├── 01_schema.sql      (HOT Memory, WARM MergeTree+HNSW, GRAPH edges)
-│   ├── 02_seed.py         (deterministic data gen + Gemini embeddings w/ cache)
-│   └── .embedding_cache/  (gitignored; sha256(input)->vector JSON files)
-├── queries/
+├── README.md            this file
+├── Makefile             reproducibility entry point
+├── queries/             one .sql file per tool query (T1-T8)
 │   ├── T1_scan_live_stream.sql
 │   ├── T2_open_investigation.sql
 │   ├── T3_recall_memory.sql
@@ -85,81 +89,108 @@ benchmarks/
 │   ├── T7_save_memory.sql
 │   └── T8_graph_traverse.sql
 ├── harness/
-│   ├── run_bench.py       (runs each query, captures system.query_log)
-│   └── render_report.py   (results.json + results.md)
+│   ├── run_bench.py             runs each query, captures system.query_log
+│   ├── render_report.py         results/latest.json → results/latest.md
+│   ├── run_demos.py             4-scenario demo run, writes demo_scenarios.{json,md}
+│   ├── run_execution_report.py  end-to-end agent session simulator
+│   └── screenshot_deck.py       Playwright screenshots of slide deck
 ├── baseline/
-│   └── results.reference.json  (frozen expected values; drift check source)
-└── results/
-    └── <timestamp>.json   (gitignored; your runs)
+│   └── results.reference.json   frozen expected values; drift check source
+└── results/                     gitignored; per-run outputs land here
+    ├── latest.json
+    ├── latest.md
+    ├── diff.md
+    ├── demo_scenarios.json
+    └── demo_scenarios.md
 ```
 
-## How the harness works
+## How `make bench` works
 
-1. `make up` boots `clickhouse/clickhouse-server:26.3.x` on port 18124. Writes to
-   a named Docker volume. We use a dedicated container so the benchmark never
-   touches your dev cluster state.
-2. `make seed` runs `seed/01_schema.sql` (idempotent DDL) then `seed/02_seed.py`,
-   which:
-   - Generates 100,000 events deterministically (random service, severity, time
-     window, seeded).
-   - Generates 5,000 incidents with human-readable bodies from a fixed template.
-   - Embeds incident bodies with `gemini-embedding-001` (768-d). Cache hit on
-     reruns. Batches of 100.
-   - Loads 40 services + ~120 edges into `service_edges`.
-3. `make bench` runs each of 8 query files 50 times, after a 5-iteration warmup.
-   For every run, it pulls `read_rows`, `read_bytes`, `query_duration_ms`, and
-   `result_rows` from `system.query_log` using the `query_id` it sets per run.
-4. `make report` diffs today's run against `baseline/results.reference.json`.
-   Any drift in `read_rows` or `read_bytes` is flagged.
+1. `make check-cluster` — `SELECT version()` plus a row-count summary of every
+   seeded table in the demo database. Fails fast if the cluster is unreachable
+   or unseeded.
 
-## How `make check` catches regressions
+2. `make bench` runs each of the 8 query files `ITERATIONS` times with
+   `WARMUP` warmup iterations first. For every run, the harness sets a unique
+   `query_id`, executes the query, then pulls `read_rows`, `read_bytes`,
+   `query_duration_ms`, and `result_rows` from `system.query_log` keyed on
+   that id. Results land in `results/latest.json` and a derived
+   `results/latest.md`.
 
-```bash
-make bench && make check
-```
+3. `make report` re-renders `latest.md` from `latest.json`. Useful after a
+   manual edit or when reprocessing an older run.
 
-`check` loads the most recent `results/<timestamp>.json`, reads
-`baseline/results.reference.json`, and asserts:
-
-- `read_rows` matches exactly (0% tolerance)
-- `read_bytes` matches within 5% (small variance from CH internal metadata)
-- p50 `query_duration_ms` within 3× the baseline (laptops vary; 3× covers it)
-
-It exits 1 on drift, printing which tool regressed and by how much. Wire this
-into CI if you want.
+4. `make diff` compares the latest run against `baseline/results.reference.json`
+   and writes `results/diff.md`. Drift on `read_rows` or `read_bytes` is the
+   signal worth attention.
 
 ## Updating the baseline
 
-If a schema change legitimately moves the numbers:
+If a schema change legitimately moves the deterministic numbers:
 
 ```bash
 make bench
-cp results/<timestamp>.json baseline/results.reference.json
+cp results/latest.json baseline/results.reference.json
 git add baseline/results.reference.json
-git commit -m "bench: update baseline after <reason>"
+git commit -m "bench: re-baseline after <reason>"
 ```
 
-Keep the reason explicit in the commit. Baselines drift silently otherwise.
+Keep the reason explicit in the commit message. Baselines drift silently
+otherwise.
 
-## The one number the deck cites
+## Scale note
 
-From the live SRE session report at `docs/report/example-sre-report.html`:
+The harness runs at the cookbook demo's seed scale: 200 live events, 8
+historical incidents, 10-12 graph nodes per domain. That is large enough to
+exercise every query path (HOT scan, WARM HNSW, GRAPH self-JOIN, INSERT) but
+small enough to run end to end in seconds.
 
-- 448 rows scanned across 5 tool calls
-- 68 KB read
-- 47 ms end-to-end
-- 0.003% selectivity vs a brute-force scan of `memory_long`
+Two things this scale does not demonstrate:
 
-The 448 rows figure comes from one specific session with a specific embedding
-and a specific set of primary-key values. The numbers you get from `make bench`
-will be slightly different because the harness runs every tool query 50 times
-and reports p50. What's identical: the *shape* of the numbers. Filter-first
-retrieval touches thousands of rows at worst, never millions.
+- ClickHouse columnar compression. At the demo's row counts most tables show
+  1.0-2.0x compression; vector-heavy tables show roughly 1.0x because Float32
+  embeddings do not compress. Compression ratios become meaningful at
+  production volumes (millions of rows).
+- Bloom filter granule pruning. The smallest tables fit in a single granule,
+  so the bloom filter has nothing to skip in an A/B test. Granule pruning
+  becomes effective once a table spans many granules.
 
-## Comparison bench (optional)
+If you need production-scale numbers, run this harness against a production
+ClickHouse cluster with your own data. The same query files apply.
 
-`benchmarks/comparison/` runs the same agent session against a Qdrant + Redis +
-Postgres + Neo4j stack for apples-to-apples LoC and latency. See
-`comparison/README.md` in that directory. We substitute Qdrant for Pinecone
-because Pinecone has no local-dev mode; the substitution is called out honestly
-in the results.
+## Demo session report
+
+`harness/run_execution_report.py` produces a full end-to-end agent session
+walk-through under `docs/report/`, complete with the SQL each tool emitted,
+the rows returned, and per-step latency. It is the artifact buyers and
+solution architects walk through during a demo. Re-run it any time:
+
+```bash
+python3 benchmarks/harness/run_execution_report.py
+# writes docs/report/execution-report.html and benchmarks/results/execution_report.json
+```
+
+The fixed example session at `docs/report/example-sre-session.json` is the
+frozen artifact the deck and blog cite. Its current totals (re-summable any
+time):
+
+```bash
+python3 -c "
+import json, ast
+data = json.load(open('docs/report/example-sre-session.json'))
+total_rows = total_bytes = total_ms = 0
+for st in data['steps']:
+    env = ast.literal_eval(st['envelope'])
+    p = env.get('precision') or {}
+    total_rows  += p.get('rows_read')  or 0
+    total_bytes += p.get('bytes_read') or 0
+    total_ms    += env.get('latency_ms') or 0
+print(f'rows={total_rows}, bytes={total_bytes:,} ({total_bytes/1024:.1f} KB), ms={total_ms:.2f}')
+"
+```
+
+Current sums: 5 tool calls, 455 rows scanned, 67 KB read, 84 ms end to end.
+Selectivity vs a brute-force scan of `agent_memory_long`: 0.003%.
+
+If a reader cites different totals, they are quoting a stale snapshot. Refresh
+with the script above.

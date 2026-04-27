@@ -1,6 +1,6 @@
 {
   "meta": {
-    "Generated at": "2026-04-23T07:29:27+00:00",
+    "Generated at": "2026-04-27T05:25:09+00:00",
     "ClickHouse version": "26.3.9.8",
     "ClickHouse endpoint": "http://localhost:18123",
     "Database": "enterprise_memory",
@@ -9,6 +9,58 @@
     "Graph tier backend": "ClickHouse SQL self-JOIN + UNION ALL on MergeTree edge tables"
   },
   "tables": [
+    {
+      "name": "agent_memory_long",
+      "engine": "MergeTree",
+      "total_rows": 201,
+      "columns": [
+        {
+          "name": "memory_id",
+          "type": "UUID"
+        },
+        {
+          "name": "user_id",
+          "type": "String"
+        },
+        {
+          "name": "agent_id",
+          "type": "LowCardinality(String)"
+        },
+        {
+          "name": "session_id",
+          "type": "String"
+        },
+        {
+          "name": "turn_id",
+          "type": "UInt32"
+        },
+        {
+          "name": "role",
+          "type": "LowCardinality(String)"
+        },
+        {
+          "name": "content",
+          "type": "String"
+        },
+        {
+          "name": "content_embedding",
+          "type": "Array(Float32)"
+        },
+        {
+          "name": "memory_type",
+          "type": "LowCardinality(String)"
+        },
+        {
+          "name": "importance",
+          "type": "Float32"
+        },
+        {
+          "name": "ts",
+          "type": "DateTime64(3)"
+        }
+      ],
+      "ddl": "CREATE TABLE enterprise_memory.agent_memory_long\n(\n    `memory_id` UUID DEFAULT generateUUIDv4(),\n    `user_id` String,\n    `agent_id` LowCardinality(String) DEFAULT '',\n    `session_id` String,\n    `turn_id` UInt32 DEFAULT 0,\n    `role` LowCardinality(String) DEFAULT 'assistant',\n    `content` String,\n    `content_embedding` Array(Float32),\n    `memory_type` LowCardinality(String) DEFAULT 'episodic',\n    `importance` Float32 DEFAULT 0.5,\n    `ts` DateTime64(3) DEFAULT now64(),\n    INDEX embedding_idx content_embedding TYPE vector_similarity('hnsw', 'cosineDistance', 768) GRANULARITY 1000\n)\nENGINE = MergeTree\nPARTITION BY toYYYYMM(ts)\nORDER BY (user_id, ts, session_id)\nSETTINGS index_granularity = 8192"
+    },
     {
       "name": "obs_events_stream",
       "engine": "Memory",
@@ -66,6 +118,94 @@
       "ddl": "CREATE TABLE enterprise_memory.obs_events_stream\n(\n    `event_id` UUID DEFAULT generateUUIDv4(),\n    `ts` DateTime64(3) DEFAULT now64(),\n    `service` String,\n    `host` String,\n    `level` Enum8('DEBUG' = 1, 'INFO' = 2, 'WARN' = 3, 'ERROR' = 4, 'CRITICAL' = 5),\n    `message` String,\n    `trace_id` String,\n    `span_id` String,\n    `latency_ms` Float32,\n    `error_code` Nullable(String),\n    `region` String,\n    `env` String\n)\nENGINE = Memory"
     },
     {
+      "name": "agent_memory_hot",
+      "engine": "Memory",
+      "total_rows": 185,
+      "columns": [
+        {
+          "name": "session_id",
+          "type": "String"
+        },
+        {
+          "name": "turn_id",
+          "type": "UInt32"
+        },
+        {
+          "name": "role",
+          "type": "LowCardinality(String)"
+        },
+        {
+          "name": "content",
+          "type": "String"
+        },
+        {
+          "name": "tool_name",
+          "type": "LowCardinality(String)"
+        },
+        {
+          "name": "metadata",
+          "type": "String"
+        },
+        {
+          "name": "ts",
+          "type": "DateTime64(3)"
+        }
+      ],
+      "ddl": "CREATE TABLE enterprise_memory.agent_memory_hot\n(\n    `session_id` String,\n    `turn_id` UInt32,\n    `role` LowCardinality(String),\n    `content` String,\n    `tool_name` LowCardinality(String) DEFAULT '',\n    `metadata` String DEFAULT '',\n    `ts` DateTime64(3) DEFAULT now64()\n)\nENGINE = Memory"
+    },
+    {
+      "name": "obs_incident_workspace",
+      "engine": "Memory",
+      "total_rows": 181,
+      "columns": [
+        {
+          "name": "incident_id",
+          "type": "String"
+        },
+        {
+          "name": "event_id",
+          "type": "UUID"
+        },
+        {
+          "name": "ts",
+          "type": "DateTime64(3)"
+        },
+        {
+          "name": "service",
+          "type": "String"
+        },
+        {
+          "name": "host",
+          "type": "String"
+        },
+        {
+          "name": "level",
+          "type": "String"
+        },
+        {
+          "name": "message",
+          "type": "String"
+        },
+        {
+          "name": "trace_id",
+          "type": "String"
+        },
+        {
+          "name": "latency_ms",
+          "type": "Float32"
+        },
+        {
+          "name": "error_code",
+          "type": "Nullable(String)"
+        },
+        {
+          "name": "added_at",
+          "type": "DateTime64(3)"
+        }
+      ],
+      "ddl": "CREATE TABLE enterprise_memory.obs_incident_workspace\n(\n    `incident_id` String,\n    `event_id` UUID,\n    `ts` DateTime64(3),\n    `service` String,\n    `host` String,\n    `level` String,\n    `message` String,\n    `trace_id` String,\n    `latency_ms` Float32,\n    `error_code` Nullable(String),\n    `added_at` DateTime64(3) DEFAULT now64()\n)\nENGINE = Memory"
+    },
+    {
       "name": "benchmark_writes",
       "engine": "MergeTree",
       "total_rows": 55,
@@ -116,6 +256,50 @@
         }
       ],
       "ddl": "CREATE TABLE enterprise_memory.benchmark_writes\n(\n    `memory_id` UUID DEFAULT generateUUIDv4(),\n    `user_id` String,\n    `agent_id` LowCardinality(String) DEFAULT '',\n    `session_id` String,\n    `turn_id` UInt32 DEFAULT 0,\n    `role` LowCardinality(String) DEFAULT 'assistant',\n    `content` String,\n    `content_embedding` Array(Float32),\n    `memory_type` LowCardinality(String) DEFAULT 'episodic',\n    `importance` Float32 DEFAULT 0.5,\n    `ts` DateTime64(3) DEFAULT now64(),\n    INDEX embedding_idx content_embedding TYPE vector_similarity('hnsw', 'cosineDistance', 768) GRANULARITY 1000\n)\nENGINE = MergeTree\nPARTITION BY toYYYYMM(ts)\nORDER BY (user_id, ts, session_id)\nSETTINGS index_granularity = 8192"
+    },
+    {
+      "name": "knowledge_base",
+      "engine": "MergeTree",
+      "total_rows": 30,
+      "columns": [
+        {
+          "name": "article_id",
+          "type": "UUID"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "content",
+          "type": "String"
+        },
+        {
+          "name": "content_embedding",
+          "type": "Array(Float32)"
+        },
+        {
+          "name": "category",
+          "type": "LowCardinality(String)"
+        },
+        {
+          "name": "tags",
+          "type": "Array(String)"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime64(3)"
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime64(3)"
+        },
+        {
+          "name": "access_count",
+          "type": "UInt32"
+        }
+      ],
+      "ddl": "CREATE TABLE enterprise_memory.knowledge_base\n(\n    `article_id` UUID DEFAULT generateUUIDv4(),\n    `title` String,\n    `content` String,\n    `content_embedding` Array(Float32),\n    `category` LowCardinality(String) DEFAULT 'general',\n    `tags` Array(String) DEFAULT [],\n    `created_at` DateTime64(3) DEFAULT now64(),\n    `updated_at` DateTime64(3) DEFAULT now64(),\n    `access_count` UInt32 DEFAULT 0,\n    INDEX embedding_idx content_embedding TYPE vector_similarity('hnsw', 'cosineDistance', 768) GRANULARITY 1000\n)\nENGINE = MergeTree\nORDER BY (category, article_id)\nSETTINGS index_granularity = 8192"
     },
     {
       "name": "sec_access",
@@ -180,6 +364,46 @@
         }
       ],
       "ddl": "CREATE TABLE enterprise_memory.telco_elements\n(\n    `element_id` String,\n    `element_type` String,\n    `vendor` String,\n    `model` String,\n    `region` String,\n    `site` String,\n    `install_date` Date,\n    `criticality` String\n)\nENGINE = MergeTree\nORDER BY element_id\nSETTINGS index_granularity = 8192"
+    },
+    {
+      "name": "telco_fault_workspace",
+      "engine": "Memory",
+      "total_rows": 12,
+      "columns": [
+        {
+          "name": "fault_id",
+          "type": "String"
+        },
+        {
+          "name": "element_id",
+          "type": "String"
+        },
+        {
+          "name": "ts",
+          "type": "DateTime64(3)"
+        },
+        {
+          "name": "metric",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "Float32"
+        },
+        {
+          "name": "threshold",
+          "type": "Float32"
+        },
+        {
+          "name": "severity",
+          "type": "String"
+        },
+        {
+          "name": "added_at",
+          "type": "DateTime64(3)"
+        }
+      ],
+      "ddl": "CREATE TABLE enterprise_memory.telco_fault_workspace\n(\n    `fault_id` String,\n    `element_id` String,\n    `ts` DateTime64(3),\n    `metric` String,\n    `value` Float32,\n    `threshold` Float32,\n    `severity` String,\n    `added_at` DateTime64(3) DEFAULT now64()\n)\nENGINE = Memory"
     },
     {
       "name": "telco_network_state",
@@ -538,6 +762,58 @@
       "ddl": "CREATE TABLE enterprise_memory.telco_network_events\n(\n    `event_id` UUID DEFAULT generateUUIDv4(),\n    `ts` DateTime64(3),\n    `element_id` String,\n    `event_type` String,\n    `description` String,\n    `root_cause` String,\n    `resolution` String,\n    `impact_score` Float32,\n    `customers_aff` UInt32,\n    `embedding` Array(Float32)\n)\nENGINE = MergeTree\nPARTITION BY toYYYYMM(ts)\nORDER BY (element_id, ts)\nSETTINGS index_granularity = 8192"
     },
     {
+      "name": "sec_case_workspace",
+      "engine": "Memory",
+      "total_rows": 5,
+      "columns": [
+        {
+          "name": "case_id",
+          "type": "String"
+        },
+        {
+          "name": "event_id",
+          "type": "UUID"
+        },
+        {
+          "name": "ts",
+          "type": "DateTime64(3)"
+        },
+        {
+          "name": "event_type",
+          "type": "String"
+        },
+        {
+          "name": "user_id",
+          "type": "String"
+        },
+        {
+          "name": "asset_id",
+          "type": "String"
+        },
+        {
+          "name": "src_ip",
+          "type": "String"
+        },
+        {
+          "name": "action",
+          "type": "String"
+        },
+        {
+          "name": "outcome",
+          "type": "String"
+        },
+        {
+          "name": "severity",
+          "type": "String"
+        },
+        {
+          "name": "added_at",
+          "type": "DateTime64(3)"
+        }
+      ],
+      "ddl": "CREATE TABLE enterprise_memory.sec_case_workspace\n(\n    `case_id` String,\n    `event_id` UUID,\n    `ts` DateTime64(3),\n    `event_type` String,\n    `user_id` String,\n    `asset_id` String,\n    `src_ip` String,\n    `action` String,\n    `outcome` String,\n    `severity` String,\n    `added_at` DateTime64(3) DEFAULT now64()\n)\nENGINE = Memory"
+    },
+    {
       "name": "sec_historical_incidents",
       "engine": "MergeTree",
       "total_rows": 5,
@@ -656,282 +932,6 @@
         }
       ],
       "ddl": "CREATE TABLE enterprise_memory.sec_threat_intel\n(\n    `indicator_id` UUID DEFAULT generateUUIDv4(),\n    `indicator_type` Enum8('ip' = 1, 'domain' = 2, 'hash' = 3, 'url' = 4, 'email' = 5),\n    `indicator_val` String,\n    `threat_actor` String,\n    `campaign` String,\n    `ttps` Array(String),\n    `confidence` Float32,\n    `description` String,\n    `embedding` Array(Float32),\n    `first_seen` DateTime64(3),\n    `last_seen` DateTime64(3)\n)\nENGINE = MergeTree\nPARTITION BY toYYYYMM(first_seen)\nORDER BY (indicator_type, confidence)\nSETTINGS index_granularity = 8192"
-    },
-    {
-      "name": "agent_memory_hot",
-      "engine": "Memory",
-      "total_rows": 0,
-      "columns": [
-        {
-          "name": "session_id",
-          "type": "String"
-        },
-        {
-          "name": "turn_id",
-          "type": "UInt32"
-        },
-        {
-          "name": "role",
-          "type": "LowCardinality(String)"
-        },
-        {
-          "name": "content",
-          "type": "String"
-        },
-        {
-          "name": "tool_name",
-          "type": "LowCardinality(String)"
-        },
-        {
-          "name": "metadata",
-          "type": "String"
-        },
-        {
-          "name": "ts",
-          "type": "DateTime64(3)"
-        }
-      ],
-      "ddl": "CREATE TABLE enterprise_memory.agent_memory_hot\n(\n    `session_id` String,\n    `turn_id` UInt32,\n    `role` LowCardinality(String),\n    `content` String,\n    `tool_name` LowCardinality(String) DEFAULT '',\n    `metadata` String DEFAULT '',\n    `ts` DateTime64(3) DEFAULT now64()\n)\nENGINE = Memory"
-    },
-    {
-      "name": "agent_memory_long",
-      "engine": "MergeTree",
-      "total_rows": 0,
-      "columns": [
-        {
-          "name": "memory_id",
-          "type": "UUID"
-        },
-        {
-          "name": "user_id",
-          "type": "String"
-        },
-        {
-          "name": "agent_id",
-          "type": "LowCardinality(String)"
-        },
-        {
-          "name": "session_id",
-          "type": "String"
-        },
-        {
-          "name": "turn_id",
-          "type": "UInt32"
-        },
-        {
-          "name": "role",
-          "type": "LowCardinality(String)"
-        },
-        {
-          "name": "content",
-          "type": "String"
-        },
-        {
-          "name": "content_embedding",
-          "type": "Array(Float32)"
-        },
-        {
-          "name": "memory_type",
-          "type": "LowCardinality(String)"
-        },
-        {
-          "name": "importance",
-          "type": "Float32"
-        },
-        {
-          "name": "ts",
-          "type": "DateTime64(3)"
-        }
-      ],
-      "ddl": "CREATE TABLE enterprise_memory.agent_memory_long\n(\n    `memory_id` UUID DEFAULT generateUUIDv4(),\n    `user_id` String,\n    `agent_id` LowCardinality(String) DEFAULT '',\n    `session_id` String,\n    `turn_id` UInt32 DEFAULT 0,\n    `role` LowCardinality(String) DEFAULT 'assistant',\n    `content` String,\n    `content_embedding` Array(Float32),\n    `memory_type` LowCardinality(String) DEFAULT 'episodic',\n    `importance` Float32 DEFAULT 0.5,\n    `ts` DateTime64(3) DEFAULT now64(),\n    INDEX embedding_idx content_embedding TYPE vector_similarity('hnsw', 'cosineDistance', 768) GRANULARITY 1000\n)\nENGINE = MergeTree\nPARTITION BY toYYYYMM(ts)\nORDER BY (user_id, ts, session_id)\nSETTINGS index_granularity = 8192"
-    },
-    {
-      "name": "knowledge_base",
-      "engine": "MergeTree",
-      "total_rows": 0,
-      "columns": [
-        {
-          "name": "article_id",
-          "type": "UUID"
-        },
-        {
-          "name": "title",
-          "type": "String"
-        },
-        {
-          "name": "content",
-          "type": "String"
-        },
-        {
-          "name": "content_embedding",
-          "type": "Array(Float32)"
-        },
-        {
-          "name": "category",
-          "type": "LowCardinality(String)"
-        },
-        {
-          "name": "tags",
-          "type": "Array(String)"
-        },
-        {
-          "name": "created_at",
-          "type": "DateTime64(3)"
-        },
-        {
-          "name": "updated_at",
-          "type": "DateTime64(3)"
-        },
-        {
-          "name": "access_count",
-          "type": "UInt32"
-        }
-      ],
-      "ddl": "CREATE TABLE enterprise_memory.knowledge_base\n(\n    `article_id` UUID DEFAULT generateUUIDv4(),\n    `title` String,\n    `content` String,\n    `content_embedding` Array(Float32),\n    `category` LowCardinality(String) DEFAULT 'general',\n    `tags` Array(String) DEFAULT [],\n    `created_at` DateTime64(3) DEFAULT now64(),\n    `updated_at` DateTime64(3) DEFAULT now64(),\n    `access_count` UInt32 DEFAULT 0,\n    INDEX embedding_idx content_embedding TYPE vector_similarity('hnsw', 'cosineDistance', 768) GRANULARITY 1000\n)\nENGINE = MergeTree\nORDER BY (category, article_id)\nSETTINGS index_granularity = 8192"
-    },
-    {
-      "name": "obs_incident_workspace",
-      "engine": "Memory",
-      "total_rows": 0,
-      "columns": [
-        {
-          "name": "incident_id",
-          "type": "String"
-        },
-        {
-          "name": "event_id",
-          "type": "UUID"
-        },
-        {
-          "name": "ts",
-          "type": "DateTime64(3)"
-        },
-        {
-          "name": "service",
-          "type": "String"
-        },
-        {
-          "name": "host",
-          "type": "String"
-        },
-        {
-          "name": "level",
-          "type": "String"
-        },
-        {
-          "name": "message",
-          "type": "String"
-        },
-        {
-          "name": "trace_id",
-          "type": "String"
-        },
-        {
-          "name": "latency_ms",
-          "type": "Float32"
-        },
-        {
-          "name": "error_code",
-          "type": "Nullable(String)"
-        },
-        {
-          "name": "added_at",
-          "type": "DateTime64(3)"
-        }
-      ],
-      "ddl": "CREATE TABLE enterprise_memory.obs_incident_workspace\n(\n    `incident_id` String,\n    `event_id` UUID,\n    `ts` DateTime64(3),\n    `service` String,\n    `host` String,\n    `level` String,\n    `message` String,\n    `trace_id` String,\n    `latency_ms` Float32,\n    `error_code` Nullable(String),\n    `added_at` DateTime64(3) DEFAULT now64()\n)\nENGINE = Memory"
-    },
-    {
-      "name": "sec_case_workspace",
-      "engine": "Memory",
-      "total_rows": 0,
-      "columns": [
-        {
-          "name": "case_id",
-          "type": "String"
-        },
-        {
-          "name": "event_id",
-          "type": "UUID"
-        },
-        {
-          "name": "ts",
-          "type": "DateTime64(3)"
-        },
-        {
-          "name": "event_type",
-          "type": "String"
-        },
-        {
-          "name": "user_id",
-          "type": "String"
-        },
-        {
-          "name": "asset_id",
-          "type": "String"
-        },
-        {
-          "name": "src_ip",
-          "type": "String"
-        },
-        {
-          "name": "action",
-          "type": "String"
-        },
-        {
-          "name": "outcome",
-          "type": "String"
-        },
-        {
-          "name": "severity",
-          "type": "String"
-        },
-        {
-          "name": "added_at",
-          "type": "DateTime64(3)"
-        }
-      ],
-      "ddl": "CREATE TABLE enterprise_memory.sec_case_workspace\n(\n    `case_id` String,\n    `event_id` UUID,\n    `ts` DateTime64(3),\n    `event_type` String,\n    `user_id` String,\n    `asset_id` String,\n    `src_ip` String,\n    `action` String,\n    `outcome` String,\n    `severity` String,\n    `added_at` DateTime64(3) DEFAULT now64()\n)\nENGINE = Memory"
-    },
-    {
-      "name": "telco_fault_workspace",
-      "engine": "Memory",
-      "total_rows": 0,
-      "columns": [
-        {
-          "name": "fault_id",
-          "type": "String"
-        },
-        {
-          "name": "element_id",
-          "type": "String"
-        },
-        {
-          "name": "ts",
-          "type": "DateTime64(3)"
-        },
-        {
-          "name": "metric",
-          "type": "String"
-        },
-        {
-          "name": "value",
-          "type": "Float32"
-        },
-        {
-          "name": "threshold",
-          "type": "Float32"
-        },
-        {
-          "name": "severity",
-          "type": "String"
-        },
-        {
-          "name": "added_at",
-          "type": "DateTime64(3)"
-        }
-      ],
-      "ddl": "CREATE TABLE enterprise_memory.telco_fault_workspace\n(\n    `fault_id` String,\n    `element_id` String,\n    `ts` DateTime64(3),\n    `metric` String,\n    `value` Float32,\n    `threshold` Float32,\n    `severity` String,\n    `added_at` DateTime64(3) DEFAULT now64()\n)\nENGINE = Memory"
     }
   ],
   "scenarios": [
@@ -951,71 +951,25 @@
             "minutes": 15,
             "limit": 50
           },
-          "result_count": 2,
-          "result_sample": [
-            {
-              "event_id": "3e288438-d3d8-4bbd-807a-c339482f7b89",
-              "ts": "2026-04-23 07:24:37.729",
-              "service": "svc-orders",
-              "host": "svc-orders-pod-2",
-              "level": "ERROR",
-              "message": "TLS handshake failed: certificate expired",
-              "latency_ms": 314.11563,
-              "error_code": "CONN_REFUSED",
-              "trace_id": "trace-39693"
-            },
-            {
-              "event_id": "640b385f-6d53-4393-b2df-ec06aa332982",
-              "ts": "2026-04-23 07:24:37.728",
-              "service": "svc-orders",
-              "host": "svc-orders-pod-1",
-              "level": "ERROR",
-              "message": "Deadlock detected in transaction",
-              "latency_ms": 1219.699,
-              "error_code": "DB_TIMEOUT",
-              "trace_id": "trace-13783"
-            }
-          ],
+          "result_count": 0,
+          "result_sample": [],
           "timing_client": {
             "iterations": 10,
-            "p50_ms": 2.27,
-            "p95_ms": 20.0,
-            "min_ms": 1.7,
-            "max_ms": 20.0,
-            "mean_ms": 4.09,
+            "p50_ms": 2.33,
+            "p95_ms": 7.23,
+            "min_ms": 1.9,
+            "max_ms": 7.23,
+            "mean_ms": 2.72,
             "last_result": {
-              "rows": [
-                {
-                  "event_id": "3e288438-d3d8-4bbd-807a-c339482f7b89",
-                  "ts": "2026-04-23 07:24:37.729",
-                  "service": "svc-orders",
-                  "host": "svc-orders-pod-2",
-                  "level": "ERROR",
-                  "message": "TLS handshake failed: certificate expired",
-                  "latency_ms": 314.11563,
-                  "error_code": "CONN_REFUSED",
-                  "trace_id": "trace-39693"
-                },
-                {
-                  "event_id": "640b385f-6d53-4393-b2df-ec06aa332982",
-                  "ts": "2026-04-23 07:24:37.728",
-                  "service": "svc-orders",
-                  "host": "svc-orders-pod-1",
-                  "level": "ERROR",
-                  "message": "Deadlock detected in transaction",
-                  "latency_ms": 1219.699,
-                  "error_code": "DB_TIMEOUT",
-                  "trace_id": "trace-13783"
-                }
-              ],
-              "qid": "report-1776929366490-f309daac"
+              "rows": [],
+              "qid": "report-1777267508070-583bac84"
             }
           },
           "query_log": {
             "read_rows": 200,
             "read_bytes": 28193,
             "query_duration_ms": 1,
-            "memory_usage": 5524079
+            "memory_usage": 4478014
           }
         }
       ]
@@ -1038,8 +992,8 @@
           "result_count": 5,
           "result_sample": [
             {
-              "incident_id": "3bac012b-bd05-401c-9ece-504404eeaaef",
-              "ts": "2025-10-26 03:28:40.854",
+              "incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639",
+              "ts": "2025-10-30 01:07:13.335",
               "title": "Payment service database connection pool exhaustion",
               "affected_services": [
                 "svc-payments",
@@ -1052,8 +1006,8 @@
               "similarity_distance": 0
             },
             {
-              "incident_id": "994e3a59-2580-49c9-9a6c-478b72413079",
-              "ts": "2026-03-28 11:28:40.854",
+              "incident_id": "7e753ea8-a2ec-43ed-8eaf-5305243c770d",
+              "ts": "2026-04-01 09:07:13.335",
               "title": "Payment service TLS certificate expiry causing 503s",
               "affected_services": [
                 "svc-payments",
@@ -1066,8 +1020,8 @@
               "similarity_distance": 0.2783
             },
             {
-              "incident_id": "8a49a5ee-dc33-41b8-ae70-c5d76ed56193",
-              "ts": "2025-12-31 06:28:40.854",
+              "incident_id": "cf825b3b-f076-4357-8988-a917917cf8a3",
+              "ts": "2026-01-04 04:07:13.335",
               "title": "Inventory service deadlock during flash sale",
               "affected_services": [
                 "svc-inventory",
@@ -1080,8 +1034,8 @@
               "similarity_distance": 0.2933
             },
             {
-              "incident_id": "6b1769d0-699d-4b74-91b4-cabc8afa819f",
-              "ts": "2025-12-08 07:28:40.854",
+              "incident_id": "7dd07b2e-572f-4f42-8ac8-c1953fe9fc09",
+              "ts": "2025-12-12 05:07:13.335",
               "title": "Search service memory leak causing OOM restarts",
               "affected_services": [
                 "svc-search",
@@ -1094,8 +1048,8 @@
               "similarity_distance": 0.3372
             },
             {
-              "incident_id": "3113be19-f79d-461d-816b-b73978316a43",
-              "ts": "2025-11-16 10:28:40.854",
+              "incident_id": "bb669191-f178-448e-9288-217cccaf46c8",
+              "ts": "2025-11-20 08:07:13.335",
               "title": "Auth service JWT validation latency spike",
               "affected_services": [
                 "svc-auth",
@@ -1111,16 +1065,16 @@
           ],
           "timing_client": {
             "iterations": 10,
-            "p50_ms": 5.72,
-            "p95_ms": 29.5,
-            "min_ms": 5.18,
-            "max_ms": 29.5,
-            "mean_ms": 8.47,
+            "p50_ms": 5.89,
+            "p95_ms": 10.73,
+            "min_ms": 5.03,
+            "max_ms": 10.73,
+            "mean_ms": 6.83,
             "last_result": {
               "rows": [
                 {
-                  "incident_id": "3bac012b-bd05-401c-9ece-504404eeaaef",
-                  "ts": "2025-10-26 03:28:40.854",
+                  "incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639",
+                  "ts": "2025-10-30 01:07:13.335",
                   "title": "Payment service database connection pool exhaustion",
                   "affected_services": [
                     "svc-payments",
@@ -1133,8 +1087,8 @@
                   "similarity_distance": 0
                 },
                 {
-                  "incident_id": "994e3a59-2580-49c9-9a6c-478b72413079",
-                  "ts": "2026-03-28 11:28:40.854",
+                  "incident_id": "7e753ea8-a2ec-43ed-8eaf-5305243c770d",
+                  "ts": "2026-04-01 09:07:13.335",
                   "title": "Payment service TLS certificate expiry causing 503s",
                   "affected_services": [
                     "svc-payments",
@@ -1147,8 +1101,8 @@
                   "similarity_distance": 0.2783
                 },
                 {
-                  "incident_id": "8a49a5ee-dc33-41b8-ae70-c5d76ed56193",
-                  "ts": "2025-12-31 06:28:40.854",
+                  "incident_id": "cf825b3b-f076-4357-8988-a917917cf8a3",
+                  "ts": "2026-01-04 04:07:13.335",
                   "title": "Inventory service deadlock during flash sale",
                   "affected_services": [
                     "svc-inventory",
@@ -1161,8 +1115,8 @@
                   "similarity_distance": 0.2933
                 },
                 {
-                  "incident_id": "6b1769d0-699d-4b74-91b4-cabc8afa819f",
-                  "ts": "2025-12-08 07:28:40.854",
+                  "incident_id": "7dd07b2e-572f-4f42-8ac8-c1953fe9fc09",
+                  "ts": "2025-12-12 05:07:13.335",
                   "title": "Search service memory leak causing OOM restarts",
                   "affected_services": [
                     "svc-search",
@@ -1175,8 +1129,8 @@
                   "similarity_distance": 0.3372
                 },
                 {
-                  "incident_id": "3113be19-f79d-461d-816b-b73978316a43",
-                  "ts": "2025-11-16 10:28:40.854",
+                  "incident_id": "bb669191-f178-448e-9288-217cccaf46c8",
+                  "ts": "2025-11-20 08:07:13.335",
                   "title": "Auth service JWT validation latency spike",
                   "affected_services": [
                     "svc-auth",
@@ -1190,14 +1144,14 @@
                   "similarity_distance": 0.3451
                 }
               ],
-              "qid": "report-1776929366693-5f74286b"
+              "qid": "report-1777267508226-47506532"
             }
           },
           "query_log": {
             "read_rows": 14,
-            "read_bytes": 26378,
-            "query_duration_ms": 4,
-            "memory_usage": 6470083
+            "read_bytes": 26398,
+            "query_duration_ms": 9,
+            "memory_usage": 6520491
           }
         }
       ]
@@ -1238,11 +1192,11 @@
           ],
           "timing_client": {
             "iterations": 10,
-            "p50_ms": 4.53,
-            "p95_ms": 24.96,
-            "min_ms": 3.65,
-            "max_ms": 24.96,
-            "mean_ms": 6.66,
+            "p50_ms": 5.42,
+            "p95_ms": 8.17,
+            "min_ms": 4.4,
+            "max_ms": 8.17,
+            "mean_ms": 5.38,
             "last_result": {
               "rows": [
                 {
@@ -1262,14 +1216,14 @@
                   "hops": 1
                 }
               ],
-              "qid": "report-1776929366865-5da4f635"
+              "qid": "report-1777267508382-c99ab092"
             }
           },
           "query_log": {
             "read_rows": 32,
             "read_bytes": 922,
             "query_duration_ms": 3,
-            "memory_usage": 5842408
+            "memory_usage": 5831107
           }
         }
       ]
@@ -1290,71 +1244,25 @@
             "minutes": 15,
             "limit": 50
           },
-          "result_count": 2,
-          "result_sample": [
-            {
-              "event_id": "3e288438-d3d8-4bbd-807a-c339482f7b89",
-              "ts": "2026-04-23 07:24:37.729",
-              "service": "svc-orders",
-              "host": "svc-orders-pod-2",
-              "level": "ERROR",
-              "message": "TLS handshake failed: certificate expired",
-              "latency_ms": 314.11563,
-              "error_code": "CONN_REFUSED",
-              "trace_id": "trace-39693"
-            },
-            {
-              "event_id": "640b385f-6d53-4393-b2df-ec06aa332982",
-              "ts": "2026-04-23 07:24:37.728",
-              "service": "svc-orders",
-              "host": "svc-orders-pod-1",
-              "level": "ERROR",
-              "message": "Deadlock detected in transaction",
-              "latency_ms": 1219.699,
-              "error_code": "DB_TIMEOUT",
-              "trace_id": "trace-13783"
-            }
-          ],
+          "result_count": 0,
+          "result_sample": [],
           "timing_client": {
             "iterations": 10,
-            "p50_ms": 2.38,
-            "p95_ms": 2.74,
-            "min_ms": 1.93,
-            "max_ms": 2.74,
-            "mean_ms": 2.39,
+            "p50_ms": 3.41,
+            "p95_ms": 7.12,
+            "min_ms": 2.12,
+            "max_ms": 7.12,
+            "mean_ms": 3.44,
             "last_result": {
-              "rows": [
-                {
-                  "event_id": "3e288438-d3d8-4bbd-807a-c339482f7b89",
-                  "ts": "2026-04-23 07:24:37.729",
-                  "service": "svc-orders",
-                  "host": "svc-orders-pod-2",
-                  "level": "ERROR",
-                  "message": "TLS handshake failed: certificate expired",
-                  "latency_ms": 314.11563,
-                  "error_code": "CONN_REFUSED",
-                  "trace_id": "trace-39693"
-                },
-                {
-                  "event_id": "640b385f-6d53-4393-b2df-ec06aa332982",
-                  "ts": "2026-04-23 07:24:37.728",
-                  "service": "svc-orders",
-                  "host": "svc-orders-pod-1",
-                  "level": "ERROR",
-                  "message": "Deadlock detected in transaction",
-                  "latency_ms": 1219.699,
-                  "error_code": "DB_TIMEOUT",
-                  "trace_id": "trace-13783"
-                }
-              ],
-              "qid": "report-1776929366986-7ebcda1d"
+              "rows": [],
+              "qid": "report-1777267508514-493c8863"
             }
           },
           "query_log": {
             "read_rows": 200,
             "read_bytes": 28193,
             "query_duration_ms": 1,
-            "memory_usage": 5524079
+            "memory_usage": 4477662
           }
         },
         {
@@ -1370,8 +1278,8 @@
           "result_count": 5,
           "result_sample": [
             {
-              "incident_id": "3bac012b-bd05-401c-9ece-504404eeaaef",
-              "ts": "2025-10-26 03:28:40.854",
+              "incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639",
+              "ts": "2025-10-30 01:07:13.335",
               "title": "Payment service database connection pool exhaustion",
               "affected_services": [
                 "svc-payments",
@@ -1384,8 +1292,8 @@
               "similarity_distance": 0
             },
             {
-              "incident_id": "994e3a59-2580-49c9-9a6c-478b72413079",
-              "ts": "2026-03-28 11:28:40.854",
+              "incident_id": "7e753ea8-a2ec-43ed-8eaf-5305243c770d",
+              "ts": "2026-04-01 09:07:13.335",
               "title": "Payment service TLS certificate expiry causing 503s",
               "affected_services": [
                 "svc-payments",
@@ -1398,8 +1306,8 @@
               "similarity_distance": 0.2783
             },
             {
-              "incident_id": "8a49a5ee-dc33-41b8-ae70-c5d76ed56193",
-              "ts": "2025-12-31 06:28:40.854",
+              "incident_id": "cf825b3b-f076-4357-8988-a917917cf8a3",
+              "ts": "2026-01-04 04:07:13.335",
               "title": "Inventory service deadlock during flash sale",
               "affected_services": [
                 "svc-inventory",
@@ -1412,8 +1320,8 @@
               "similarity_distance": 0.2933
             },
             {
-              "incident_id": "6b1769d0-699d-4b74-91b4-cabc8afa819f",
-              "ts": "2025-12-08 07:28:40.854",
+              "incident_id": "7dd07b2e-572f-4f42-8ac8-c1953fe9fc09",
+              "ts": "2025-12-12 05:07:13.335",
               "title": "Search service memory leak causing OOM restarts",
               "affected_services": [
                 "svc-search",
@@ -1426,8 +1334,8 @@
               "similarity_distance": 0.3372
             },
             {
-              "incident_id": "3113be19-f79d-461d-816b-b73978316a43",
-              "ts": "2025-11-16 10:28:40.854",
+              "incident_id": "bb669191-f178-448e-9288-217cccaf46c8",
+              "ts": "2025-11-20 08:07:13.335",
               "title": "Auth service JWT validation latency spike",
               "affected_services": [
                 "svc-auth",
@@ -1443,16 +1351,16 @@
           ],
           "timing_client": {
             "iterations": 10,
-            "p50_ms": 6.78,
-            "p95_ms": 20.73,
-            "min_ms": 4.48,
-            "max_ms": 20.73,
-            "mean_ms": 7.74,
+            "p50_ms": 5.57,
+            "p95_ms": 6.21,
+            "min_ms": 4.85,
+            "max_ms": 6.21,
+            "mean_ms": 5.51,
             "last_result": {
               "rows": [
                 {
-                  "incident_id": "3bac012b-bd05-401c-9ece-504404eeaaef",
-                  "ts": "2025-10-26 03:28:40.854",
+                  "incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639",
+                  "ts": "2025-10-30 01:07:13.335",
                   "title": "Payment service database connection pool exhaustion",
                   "affected_services": [
                     "svc-payments",
@@ -1465,8 +1373,8 @@
                   "similarity_distance": 0
                 },
                 {
-                  "incident_id": "994e3a59-2580-49c9-9a6c-478b72413079",
-                  "ts": "2026-03-28 11:28:40.854",
+                  "incident_id": "7e753ea8-a2ec-43ed-8eaf-5305243c770d",
+                  "ts": "2026-04-01 09:07:13.335",
                   "title": "Payment service TLS certificate expiry causing 503s",
                   "affected_services": [
                     "svc-payments",
@@ -1479,8 +1387,8 @@
                   "similarity_distance": 0.2783
                 },
                 {
-                  "incident_id": "8a49a5ee-dc33-41b8-ae70-c5d76ed56193",
-                  "ts": "2025-12-31 06:28:40.854",
+                  "incident_id": "cf825b3b-f076-4357-8988-a917917cf8a3",
+                  "ts": "2026-01-04 04:07:13.335",
                   "title": "Inventory service deadlock during flash sale",
                   "affected_services": [
                     "svc-inventory",
@@ -1493,8 +1401,8 @@
                   "similarity_distance": 0.2933
                 },
                 {
-                  "incident_id": "6b1769d0-699d-4b74-91b4-cabc8afa819f",
-                  "ts": "2025-12-08 07:28:40.854",
+                  "incident_id": "7dd07b2e-572f-4f42-8ac8-c1953fe9fc09",
+                  "ts": "2025-12-12 05:07:13.335",
                   "title": "Search service memory leak causing OOM restarts",
                   "affected_services": [
                     "svc-search",
@@ -1507,8 +1415,8 @@
                   "similarity_distance": 0.3372
                 },
                 {
-                  "incident_id": "3113be19-f79d-461d-816b-b73978316a43",
-                  "ts": "2025-11-16 10:28:40.854",
+                  "incident_id": "bb669191-f178-448e-9288-217cccaf46c8",
+                  "ts": "2025-11-20 08:07:13.335",
                   "title": "Auth service JWT validation latency spike",
                   "affected_services": [
                     "svc-auth",
@@ -1522,14 +1430,14 @@
                   "similarity_distance": 0.3451
                 }
               ],
-              "qid": "report-1776929367171-af98e6f8"
+              "qid": "report-1777267508661-c96001b8"
             }
           },
           "query_log": {
             "read_rows": 14,
-            "read_bytes": 26378,
-            "query_duration_ms": 3,
-            "memory_usage": 6483995
+            "read_bytes": 26398,
+            "query_duration_ms": 4,
+            "memory_usage": 6520315
           }
         },
         {
@@ -1539,16 +1447,16 @@
           "description": "Hydrate one historical incident by primary key.",
           "query": "-- WARM tier: FETCH A RUNBOOK BY ID.\n        -- Deterministic lookup: no vector math, just the full\n        -- historical incident row so the agent can quote the resolution.\n        SELECT incident_id, title, root_cause, resolution,\n               duration_min, toString(severity) AS severity, affected_services\n        FROM enterprise_memory.obs_historical_incidents\n        WHERE incident_id = {identifier:String}",
           "bind_params": {
-            "identifier": "994e3a59-2580-49c9-9a6c-478b72413079"
+            "identifier": "453bbaff-5bef-4774-92c4-4ba9b1b73639"
           },
           "result_count": 1,
           "result_sample": [
             {
-              "incident_id": "994e3a59-2580-49c9-9a6c-478b72413079",
-              "title": "Payment service TLS certificate expiry causing 503s",
-              "root_cause": "Certificate renewal automation failed silently 30 days prior; no alerting on expiry",
-              "resolution": "Renewed certificate, implemented cert-manager with 30-day pre-expiry alerts",
-              "duration_min": 8,
+              "incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639",
+              "title": "Payment service database connection pool exhaustion",
+              "root_cause": "Database connection pool limit set too low; connection leak in payment retry logic",
+              "resolution": "Increased pool size from 50 to 200, fixed connection leak, added circuit breaker",
+              "duration_min": 45,
               "severity": "P1",
               "affected_services": [
                 "svc-payments",
@@ -1558,19 +1466,19 @@
           ],
           "timing_client": {
             "iterations": 10,
-            "p50_ms": 2.11,
-            "p95_ms": 3.09,
-            "min_ms": 1.76,
-            "max_ms": 3.09,
-            "mean_ms": 2.18,
+            "p50_ms": 2.86,
+            "p95_ms": 5.02,
+            "min_ms": 2.37,
+            "max_ms": 5.02,
+            "mean_ms": 3.17,
             "last_result": {
               "rows": [
                 {
-                  "incident_id": "994e3a59-2580-49c9-9a6c-478b72413079",
-                  "title": "Payment service TLS certificate expiry causing 503s",
-                  "root_cause": "Certificate renewal automation failed silently 30 days prior; no alerting on expiry",
-                  "resolution": "Renewed certificate, implemented cert-manager with 30-day pre-expiry alerts",
-                  "duration_min": 8,
+                  "incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639",
+                  "title": "Payment service database connection pool exhaustion",
+                  "root_cause": "Database connection pool limit set too low; connection leak in payment retry logic",
+                  "resolution": "Increased pool size from 50 to 200, fixed connection leak, added circuit breaker",
+                  "duration_min": 45,
                   "severity": "P1",
                   "affected_services": [
                     "svc-payments",
@@ -1578,14 +1486,14 @@
                   ]
                 }
               ],
-              "qid": "report-1776929367294-cc0f3780"
+              "qid": "report-1777267508785-368eed13"
             }
           },
           "query_log": {
-            "read_rows": 2,
-            "read_bytes": 525,
-            "query_duration_ms": 0,
-            "memory_usage": 5431812
+            "read_rows": 1,
+            "read_bytes": 283,
+            "query_duration_ms": 2,
+            "memory_usage": 5431608
           }
         },
         {
@@ -1619,11 +1527,11 @@
           ],
           "timing_client": {
             "iterations": 10,
-            "p50_ms": 4.24,
-            "p95_ms": 6.51,
-            "min_ms": 3.82,
-            "max_ms": 6.51,
-            "mean_ms": 4.58,
+            "p50_ms": 5.1,
+            "p95_ms": 7.93,
+            "min_ms": 3.87,
+            "max_ms": 7.93,
+            "mean_ms": 5.19,
             "last_result": {
               "rows": [
                 {
@@ -1643,14 +1551,14 @@
                   "hops": 1
                 }
               ],
-              "qid": "report-1776929367436-52d107de"
+              "qid": "report-1777267508930-6c27cfbe"
             }
           },
           "query_log": {
             "read_rows": 32,
             "read_bytes": 922,
-            "query_duration_ms": 3,
-            "memory_usage": 5831299
+            "query_duration_ms": 6,
+            "memory_usage": 5842760
           }
         }
       ]

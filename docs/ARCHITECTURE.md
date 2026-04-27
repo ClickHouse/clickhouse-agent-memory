@@ -26,10 +26,20 @@ Consolidate all three memory layers into a single ClickHouse cluster:
 | Semantic search at scale | Native HNSW vector indexes on Array(Float32) |
 | Structured filtering + analytics | Columnar storage, distributed SQL |
 | Graph traversal | Self-JOIN + UNION ALL on MergeTree edge tables (obs_dependencies, telco_connections, sec_access) |
-| Cost efficiency | 10:1 compression, tiered storage to S3 |
+| Cost efficiency | Columnar compression (production-scale; demo data is too small to demonstrate) plus tiered storage to S3 |
 | Horizontal scaling | Distributed tables, sharding, replication |
 
-This eliminates the need for separate vector, graph, and cache databases -- reducing infrastructure costs by 50-60% and operational complexity by 70%.
+This eliminates the need for separate vector, graph, and cache databases. Measured against the matched stitched-stack reference implementation in `comparison/`:
+
+- **Lines of code:** 162 vs 382 (58% reduction, blanks/comments excluded; 184 vs 465 raw)
+- **Database client libraries:** 1 vs 4 (`clickhouse_connect` vs `redis` + `pinecone` + `neo4j` + `psycopg2`)
+- **Distinct backing services:** 1 vs 4
+- **Query languages in flight:** 1 (SQL) vs 4 (Redis cmd, Pinecone REST, Cypher, SQL)
+- **Operational surfaces:** 1 vs 4 (one cluster to backup, upgrade, monitor, secure)
+- **Cross-tier writes in one transaction:** yes vs no
+- **Cross-tier JOINs in one query:** yes vs no
+
+Reproduce: `cd comparison && make compare`.
 
 ---
 

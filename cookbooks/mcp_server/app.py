@@ -29,19 +29,21 @@ to maintain continuity across user sessions via the conversation-memory
 tools:
 
   Domain tier tools
-    memory_hot_scan          -- live event stream (Memory engine, sub-5ms)
-    memory_hot_workspace     -- materialise a per-case workspace
-    memory_warm_search       -- vector similarity over historical incidents
-    memory_warm_lookup       -- full playbook / threat intel by id
-    memory_graph_traverse    -- blast radius / topology / lateral movement
+    search_events            -- live event stream (HOT, Memory engine, sub-5ms)
+    create_case              -- materialise a per-case workspace (HOT)
+    semantic_search          -- vector similarity over historical incidents (WARM)
+    get_record               -- full playbook / threat intel by id (WARM)
+    find_related_entities    -- blast radius / topology / lateral movement (GRAPH)
 
   Conversation-memory tools
-    memory_conversation_window   -- last N turns in the current session (HOT)
-    memory_conversation_recall   -- cross-session semantic recall (WARM)
-    memory_conversation_remember -- persist a distilled preference (WARM)
+    list_session_messages       -- last N turns in the current session (HOT)
+    get_conversation_history    -- cross-session semantic recall (WARM)
+    add_memory                  -- persist a distilled preference (WARM)
 
-Every response includes a banner_markdown field. Echo it verbatim before
-your text reply so the user can see which memory tier answered.
+Every response includes a `tier` field plus a `precision` block with
+`rows_read`, `bytes_read`, `selectivity`, and `index_hint`. Mention the
+tier (HOT / WARM / GRAPH) in your reply so the user can see which memory
+layer answered.
 """
 
 

@@ -1,16 +1,16 @@
 {
-  "ran_at": "2026-04-22T07:34:59Z",
+  "ran_at": "2026-04-27T05:11:54Z",
   "ch_version": "26.3.9.8",
   "ch_http": "http://localhost:18123",
   "database": "enterprise_memory",
   "canonical_service": "svc-orders",
   "canonical_user": "u-maruthi",
   "canonical_domain": "observability",
-  "canonical_incident_id": "04e3c725-1ff3-4b1c-b633-33dc3dc4532e",
+  "canonical_incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639",
   "iterations": 25,
   "warmup": 3,
   "sql_source": "cookbooks/mcp_server/queries.py (live MCP templates, same as production)",
-  "duration_s": 9.31,
+  "duration_s": 7.92,
   "scenarios": [
     {
       "demo": 1,
@@ -32,8 +32,8 @@
       "read_rows_p50": 200,
       "read_bytes_p50": 28193,
       "query_duration_ms_p50": 1.0,
-      "query_duration_ms_p95": 2.0,
-      "result_rows_p50": 0
+      "query_duration_ms_p95": 1.0,
+      "result_rows_p50": 2
     },
     {
       "demo": 2,
@@ -42,16 +42,17 @@
       "tool": "semantic_search",
       "user_question": "\"Find past incidents that look like a database connection timeout on svc-orders.\"",
       "params": {
-        "k": "5"
+        "k": "5",
+        "days": "180"
       },
-      "feature": "MergeTree + HNSW vector_similarity('hnsw','cosineDistance',768) inside the table",
+      "feature": "MergeTree + HNSW vector_similarity('hnsw','cosineDistance',768) inside the table; WHERE ts >= now() - 180 DAY prunes whole monthly partitions before HNSW runs",
       "proves": "Filter-first retrieval. HNSW rank on the surviving set.",
       "caveat": "pgvector / Qdrant do this too. CH wins when filter volumes + data are heavy.",
       "source": "cookbooks/mcp_server/queries.py :: WARM_VECTOR_SQL['observability']",
-      "sql_rendered": "-- WARM tier: SEMANTIC SEARCH over past observability incidents.\n        -- `embedding` is Array(Float32). cosineDistance returns 0 for an\n        -- identical vector and 2 for the opposite direction, so LOWER is\n        -- more similar. The HNSW index makes the ORDER BY LIMIT k fast.\n        SELECT incident_id, ts, title, affected_services,\n               root_cause, resolution,\n               toString(severity) AS severity, duration_min,\n               -- Rounded copy for display; the un-rounded form drives the sort.\n               round(cosineDistance(embedding, [\u2026768-d query vector\u2026]), 4) AS similarity_distance\n        FROM enterprise_memory.obs_historical_incidents\n        -- ORDER BY uses the un-rounded distance so the HNSW index kicks in.\n        ORDER BY cosineDistance(embedding, [\u2026768-d query vector\u2026]) ASC\n        LIMIT {k:UInt32}",
+      "sql_rendered": "-- WARM tier: SEMANTIC SEARCH over past observability incidents.\n        -- `embedding` is Array(Float32). cosineDistance returns 0 for an\n        -- identical vector and 2 for the opposite direction, so LOWER is\n        -- more similar. The HNSW index makes the ORDER BY LIMIT k fast.\n        --\n        -- Filter-first, rank-second: the ts window prunes whole monthly\n        -- partitions (PARTITION BY toYYYYMM(ts)) before HNSW sees a single\n        -- row. Rule: query-join-filter-before (filter before the expensive\n        -- op \u2014 here the expensive op is HNSW rank, not a JOIN).\n        SELECT incident_id, ts, title, affected_services,\n               root_cause, resolution,\n               toString(severity) AS severity, duration_min,\n               -- Rounded copy for display; the un-rounded form drives the sort.\n               round(cosineDistance(embedding, [\u2026768-d query vector\u2026]), 4) AS similarity_distance\n        FROM enterprise_memory.obs_historical_incidents\n        WHERE ts >= now() - INTERVAL {days:UInt32} DAY\n        -- ORDER BY uses the un-rounded distance so the HNSW index kicks in.\n        ORDER BY cosineDistance(embedding, [\u2026768-d query vector\u2026]) ASC\n        LIMIT {k:UInt32}",
       "iterations": 25,
       "read_rows_p50": 14,
-      "read_bytes_p50": 26362,
+      "read_bytes_p50": 26398,
       "query_duration_ms_p50": 3.0,
       "query_duration_ms_p95": 5.0,
       "result_rows_p50": 5
@@ -70,12 +71,12 @@
       "proves": "Graph walks don't need a separate graph DB for 2-hop blast radius.",
       "caveat": "Neo4j / Memgraph still win at hard graph algorithms.",
       "source": "cookbooks/mcp_server/queries.py :: GRAPH_TRAVERSE_SQL['observability']",
-      "sql_rendered": "-- GRAPH tier: multi-hop dependency traversal for observability.\n        -- Question: \"who depends on <service>?\" (upstream blast radius).\n        --\n        -- Hop 1: direct dependents of the target service.\n        SELECT d.from_service AS related, s.criticality, s.team,\n               d.dep_type AS edge_type, d.latency_p99, 1 AS hops\n        FROM enterprise_memory.obs_dependencies d\n        JOIN enterprise_memory.obs_services s ON s.service_id = d.from_service\n        WHERE d.to_service = {entity:String}\n\n        UNION ALL\n\n        -- Hop 2: services that depend on services that depend on the target.\n        -- Only emitted when max_hops >= 2.\n        SELECT d2.from_service, s2.criticality, s2.team,\n               d2.dep_type, d2.latency_p99, 2 AS hops\n        FROM enterprise_memory.obs_dependencies d2\n        JOIN enterprise_memory.obs_services s2 ON s2.service_id = d2.from_service\n        WHERE d2.to_service IN (\n            SELECT from_service FROM enterprise_memory.obs_dependencies\n            WHERE to_service = {entity:String}\n        )\n        AND {max_hops:UInt32} >= 2",
+      "sql_rendered": "-- GRAPH tier: multi-hop dependency traversal for observability.\n        -- Question: \"who depends on <service>?\" (upstream blast radius).\n        --\n        -- Optimisations applied per clickhouse-best-practices:\n        --   * obs_dependencies has a bloom_filter skipping index on to_service\n        --     because ORDER BY (from_service, to_service) cannot prune on the\n        --     second key alone (rule: query-index-skipping-indices).\n        --   * JOIN to obs_services is 1:1 (service_id is the primary key of\n        --     that table), so LEFT ANY JOIN is used for smaller memory\n        --     footprint (rule: query-join-use-any).\n        --\n        -- Hop 1: direct dependents of the target service.\n        SELECT d.from_service AS related, s.criticality, s.team,\n               d.dep_type AS edge_type, d.latency_p99, 1 AS hops\n        FROM enterprise_memory.obs_dependencies d\n        LEFT ANY JOIN enterprise_memory.obs_services s\n               ON s.service_id = d.from_service\n        WHERE d.to_service = {entity:String}\n\n        UNION ALL\n\n        -- Hop 2: services that depend on services that depend on the target.\n        -- Only emitted when max_hops >= 2. The subquery is filtered first\n        -- (rule: query-join-filter-before \u2014 same principle for IN lists).\n        SELECT d2.from_service, s2.criticality, s2.team,\n               d2.dep_type, d2.latency_p99, 2 AS hops\n        FROM enterprise_memory.obs_dependencies d2\n        LEFT ANY JOIN enterprise_memory.obs_services s2\n               ON s2.service_id = d2.from_service\n        WHERE d2.to_service IN (\n            SELECT from_service FROM enterprise_memory.obs_dependencies\n            WHERE to_service = {entity:String}\n        )\n        AND {max_hops:UInt32} >= 2",
       "iterations": 25,
-      "read_rows_p50": 53,
-      "read_bytes_p50": 1285,
+      "read_rows_p50": 32,
+      "read_bytes_p50": 922,
       "query_duration_ms_p50": 3.0,
-      "query_duration_ms_p95": 5.0,
+      "query_duration_ms_p95": 4.0,
       "result_rows_p50": 2
     },
     {
@@ -97,8 +98,8 @@
       "read_rows_p50": 200,
       "read_bytes_p50": 28193,
       "query_duration_ms_p50": 1.0,
-      "query_duration_ms_p95": 2.0,
-      "result_rows_p50": 0
+      "query_duration_ms_p95": 1.0,
+      "result_rows_p50": 2
     },
     {
       "demo": 4,
@@ -108,15 +109,16 @@
       "step": "2/4",
       "sub_intent": "find similar past incident",
       "params": {
-        "k": "3"
+        "k": "3",
+        "days": "180"
       },
       "source": "WARM_VECTOR_SQL['observability']",
-      "sql_rendered": "-- WARM tier: SEMANTIC SEARCH over past observability incidents.\n        -- `embedding` is Array(Float32). cosineDistance returns 0 for an\n        -- identical vector and 2 for the opposite direction, so LOWER is\n        -- more similar. The HNSW index makes the ORDER BY LIMIT k fast.\n        SELECT incident_id, ts, title, affected_services,\n               root_cause, resolution,\n               toString(severity) AS severity, duration_min,\n               -- Rounded copy for display; the un-rounded form drives the sort.\n               round(cosineDistance(embedding, [\u2026768-d query vector\u2026]), 4) AS similarity_distance\n        FROM enterprise_memory.obs_historical_incidents\n        -- ORDER BY uses the un-rounded distance so the HNSW index kicks in.\n        ORDER BY cosineDistance(embedding, [\u2026768-d query vector\u2026]) ASC\n        LIMIT {k:UInt32}",
+      "sql_rendered": "-- WARM tier: SEMANTIC SEARCH over past observability incidents.\n        -- `embedding` is Array(Float32). cosineDistance returns 0 for an\n        -- identical vector and 2 for the opposite direction, so LOWER is\n        -- more similar. The HNSW index makes the ORDER BY LIMIT k fast.\n        --\n        -- Filter-first, rank-second: the ts window prunes whole monthly\n        -- partitions (PARTITION BY toYYYYMM(ts)) before HNSW sees a single\n        -- row. Rule: query-join-filter-before (filter before the expensive\n        -- op \u2014 here the expensive op is HNSW rank, not a JOIN).\n        SELECT incident_id, ts, title, affected_services,\n               root_cause, resolution,\n               toString(severity) AS severity, duration_min,\n               -- Rounded copy for display; the un-rounded form drives the sort.\n               round(cosineDistance(embedding, [\u2026768-d query vector\u2026]), 4) AS similarity_distance\n        FROM enterprise_memory.obs_historical_incidents\n        WHERE ts >= now() - INTERVAL {days:UInt32} DAY\n        -- ORDER BY uses the un-rounded distance so the HNSW index kicks in.\n        ORDER BY cosineDistance(embedding, [\u2026768-d query vector\u2026]) ASC\n        LIMIT {k:UInt32}",
       "iterations": 25,
-      "read_rows_p50": 13,
-      "read_bytes_p50": 26080,
+      "read_rows_p50": 12,
+      "read_bytes_p50": 25868,
       "query_duration_ms_p50": 3.0,
-      "query_duration_ms_p95": 7.0,
+      "query_duration_ms_p95": 4.0,
       "result_rows_p50": 3
     },
     {
@@ -127,14 +129,14 @@
       "step": "3/4",
       "sub_intent": "hydrate top match (runbook + resolution)",
       "params": {
-        "identifier": "04e3c725-1ff3-4b1c-b633-33dc3dc4532e"
+        "identifier": "453bbaff-5bef-4774-92c4-4ba9b1b73639"
       },
       "source": "WARM_LOOKUP_SQL[('observability','runbook')]",
       "sql_rendered": "-- WARM tier: FETCH A RUNBOOK BY ID.\n        -- Deterministic lookup: no vector math, just the full\n        -- historical incident row so the agent can quote the resolution.\n        SELECT incident_id, title, root_cause, resolution,\n               duration_min, toString(severity) AS severity, affected_services\n        FROM enterprise_memory.obs_historical_incidents\n        WHERE incident_id = {identifier:String}",
       "iterations": 25,
       "read_rows_p50": 1,
       "read_bytes_p50": 283,
-      "query_duration_ms_p50": 1.0,
+      "query_duration_ms_p50": 0.0,
       "query_duration_ms_p95": 1.0,
       "result_rows_p50": 1
     },
@@ -150,12 +152,12 @@
         "max_hops": "2"
       },
       "source": "GRAPH_TRAVERSE_SQL['observability']",
-      "sql_rendered": "-- GRAPH tier: multi-hop dependency traversal for observability.\n        -- Question: \"who depends on <service>?\" (upstream blast radius).\n        --\n        -- Hop 1: direct dependents of the target service.\n        SELECT d.from_service AS related, s.criticality, s.team,\n               d.dep_type AS edge_type, d.latency_p99, 1 AS hops\n        FROM enterprise_memory.obs_dependencies d\n        JOIN enterprise_memory.obs_services s ON s.service_id = d.from_service\n        WHERE d.to_service = {entity:String}\n\n        UNION ALL\n\n        -- Hop 2: services that depend on services that depend on the target.\n        -- Only emitted when max_hops >= 2.\n        SELECT d2.from_service, s2.criticality, s2.team,\n               d2.dep_type, d2.latency_p99, 2 AS hops\n        FROM enterprise_memory.obs_dependencies d2\n        JOIN enterprise_memory.obs_services s2 ON s2.service_id = d2.from_service\n        WHERE d2.to_service IN (\n            SELECT from_service FROM enterprise_memory.obs_dependencies\n            WHERE to_service = {entity:String}\n        )\n        AND {max_hops:UInt32} >= 2",
+      "sql_rendered": "-- GRAPH tier: multi-hop dependency traversal for observability.\n        -- Question: \"who depends on <service>?\" (upstream blast radius).\n        --\n        -- Optimisations applied per clickhouse-best-practices:\n        --   * obs_dependencies has a bloom_filter skipping index on to_service\n        --     because ORDER BY (from_service, to_service) cannot prune on the\n        --     second key alone (rule: query-index-skipping-indices).\n        --   * JOIN to obs_services is 1:1 (service_id is the primary key of\n        --     that table), so LEFT ANY JOIN is used for smaller memory\n        --     footprint (rule: query-join-use-any).\n        --\n        -- Hop 1: direct dependents of the target service.\n        SELECT d.from_service AS related, s.criticality, s.team,\n               d.dep_type AS edge_type, d.latency_p99, 1 AS hops\n        FROM enterprise_memory.obs_dependencies d\n        LEFT ANY JOIN enterprise_memory.obs_services s\n               ON s.service_id = d.from_service\n        WHERE d.to_service = {entity:String}\n\n        UNION ALL\n\n        -- Hop 2: services that depend on services that depend on the target.\n        -- Only emitted when max_hops >= 2. The subquery is filtered first\n        -- (rule: query-join-filter-before \u2014 same principle for IN lists).\n        SELECT d2.from_service, s2.criticality, s2.team,\n               d2.dep_type, d2.latency_p99, 2 AS hops\n        FROM enterprise_memory.obs_dependencies d2\n        LEFT ANY JOIN enterprise_memory.obs_services s2\n               ON s2.service_id = d2.from_service\n        WHERE d2.to_service IN (\n            SELECT from_service FROM enterprise_memory.obs_dependencies\n            WHERE to_service = {entity:String}\n        )\n        AND {max_hops:UInt32} >= 2",
       "iterations": 25,
-      "read_rows_p50": 53,
-      "read_bytes_p50": 1285,
-      "query_duration_ms_p50": 3.0,
-      "query_duration_ms_p95": 4.0,
+      "read_rows_p50": 32,
+      "read_bytes_p50": 922,
+      "query_duration_ms_p50": 2.0,
+      "query_duration_ms_p95": 3.0,
       "result_rows_p50": 2
     }
   ]

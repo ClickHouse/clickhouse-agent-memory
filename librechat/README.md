@@ -47,41 +47,52 @@ every call.
 ### 2. Full tool-calling via Agents
 
 Switch endpoint to **Agents**, create a new agent, and copy the template
-from `agents/ai-sre-agent.md` (or NetOps / SOC). Toggle on the five MCP
-tools (`memory_hot_scan`, `memory_hot_workspace`, `memory_warm_search`,
-`memory_warm_lookup`, `memory_graph_traverse`). Save and chat.
+from `agents/ai-sre-agent.md` (or NetOps / SOC). Toggle on the eight MCP
+tools — five domain (`search_events`, `create_case`, `semantic_search`,
+`get_record`, `find_related_entities`) plus three conversation-memory
+(`list_session_messages`, `get_conversation_history`, `add_memory`). Save
+and chat.
 
 ## MCP tool envelope
 
-Every tool returns the same shape:
+Every tool returns the same envelope shape (source: `cookbooks/mcp_server/tiers.py:envelope()`):
 
 ```json
 {
   "tier": "HOT",
-  "tier_banner": ">>> HOT MEMORY >>>",
-  "tier_engine": "ClickHouse Memory Engine",
-  "tier_latency_profile": "sub-5ms | volatile | in-memory",
   "domain": "observability",
   "operation": "search_events",
-  "sql": "SELECT ... FROM obs_events_stream ...",
   "latency_ms": 0.82,
   "row_count": 5,
-  "rows_preview": [...],
   "insights": {"top_service": "svc-payments", "top_error": "DB_TIMEOUT"},
-  "next_tool_hint": "memory_hot_workspace ..."
+  "precision": {
+    "filters_applied": ["service = 'svc-payments'", "ts >= now() - INTERVAL 15 MINUTE"],
+    "index_hint": "Memory engine, no index needed",
+    "embedding_dim": null,
+    "rows_read": 200,
+    "bytes_read": 28193,
+    "rows_returned": 5,
+    "selectivity": "2.5%",
+    "written_rows": null
+  },
+  "rows_preview": [...],
+  "sql": "SELECT ts, service, host, level, message\nFROM obs_events_stream\nWHERE service = 'svc-payments'\n  AND ts >= now() - INTERVAL 15 MINUTE\nORDER BY ts DESC LIMIT 20"
 }
 ```
 
 LibreChat renders this JSON in the tool-call panel -- that is how the
 HOT / WARM / GRAPH story surfaces in chat.
 
-| Tool                      | Tier   | Purpose                                               |
-|---------------------------|--------|-------------------------------------------------------|
-| `memory_hot_scan`         | HOT    | Scan live event / state stream for a domain           |
-| `memory_hot_workspace`    | HOT    | Materialise per-case workspace and group it           |
-| `memory_warm_search`      | WARM   | Cosine-similarity search over historical incidents    |
-| `memory_warm_lookup`      | WARM   | Pull playbook by id, or vector lookup of threat intel |
-| `memory_graph_traverse`   | GRAPH  | Multi-hop traversal across deps / topology / access   |
+| Tool                          | Tier   | Purpose                                                        |
+|-------------------------------|--------|----------------------------------------------------------------|
+| `search_events`               | HOT    | Scan live event / state stream for a domain                    |
+| `create_case`                 | HOT    | Materialise a per-case investigation workspace                 |
+| `semantic_search`             | WARM   | Cosine-similarity search over historical incidents             |
+| `get_record`                  | WARM   | Pull a runbook or threat-intel record by id or by query        |
+| `find_related_entities`       | GRAPH  | Multi-hop traversal across deps / topology / access            |
+| `list_session_messages`       | HOT    | Replay the last N turns of the current chat session            |
+| `get_conversation_history`    | WARM   | Cross-session semantic recall for this user                    |
+| `add_memory`                  | WARM   | Persist a long-term fact the agent should remember             |
 
 ## Provider configuration
 

@@ -3,7 +3,7 @@
 **Audience:** enterprise buyers + solution architects evaluating how to build AI agents at scale.
 **Runtime:** 10 min total. 5–7 min deck, 3–5 min live demo.
 **Canonical preset:** AI SRE agent.
-**Canonical anchor entity:** `svc-orders` (21 events, 3 downstream services, 4 related historical incidents).
+**Canonical anchor entity:** `svc-orders` (21 events in `obs_events_stream`, 3 services it depends on plus 2 services that depend on it, 4 related historical incidents in `obs_historical_incidents`).
 
 Every number in this script is measured by `benchmarks/harness/run_demos.py` against the live ClickHouse 26.3.9.8 cluster. Re-run any time:
 
@@ -171,7 +171,7 @@ ORDER BY hop, to_service
 
 **Why this is the payoff:** Any single tier can be replaced by a specialist database. Redis for HOT, Qdrant for WARM, Neo4j for GRAPH. But a question that **needs all three in one turn** makes the stitched stack show its seams — four round trips, four retry matrices, a merge function in application code. One ClickHouse cluster composes all three in the same query plan. The value isn't any single tool. The value is the composition.
 
-**The stitched equivalent would require:** 4 network round trips, 4 auth headers, 4 SDK shapes, a merge function to reconcile timestamps and conflicts, and a retry matrix for partial failures. Or: **465 lines of Python** at `comparison/stitched/agent.py` vs **181 lines** at `comparison/clickhouse/agent.py`. Both counts verified: `wc -l comparison/stitched/agent.py comparison/clickhouse/agent.py`.
+**The stitched equivalent would require:** 4 network round trips, 4 auth headers, 4 SDK shapes, a merge function to reconcile timestamps and conflicts, and a retry matrix for partial failures. Or: **465 lines of Python** at `comparison/stitched/agent.py` vs **184 lines** at `comparison/clickhouse/agent.py` (raw `wc -l`; 382 vs 162 with blanks and comments excluded, per `make compare`). Both counts verified: `wc -l comparison/stitched/agent.py comparison/clickhouse/agent.py`.
 
 ---
 
