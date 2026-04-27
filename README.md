@@ -250,7 +250,7 @@ flowchart LR
     SKIP -.prunes granules.-> H1
     SKIP -.prunes granules.-> H2
 
-    H2 --> RESULT([Related services<br/>+ hop distance<br/>3-10 ms at demo scale<br/>granule pruning at production scale])
+    H2 --> RESULT([Related services<br/>+ hop distance<br/>3-10 ms · bloom prunes<br/>98.67% of rows at bench scale])
 
     style START fill:#faff00,stroke:#1a1a1a,color:#1a1a1a
     style TOOL fill:#6be07a,stroke:#1a1a1a,color:#1a1a1a

@@ -1,0 +1,34 @@
+# Isolated ClickHouse for bench-scale measurements.
+# Separate from the cookbook stack so production-style claims (compression,
+# bloom filter pruning) can be measured at volumes the demo data can't reach.
+#
+# Schema is the same as the cookbook's; only the row counts differ. Same
+# `enterprise_memory` database name so the query files (T1-T8) need no edits.
+
+services:
+  clickhouse-bench:
+    image: clickhouse/clickhouse-server:26.3
+    container_name: clickhouse-bench
+    ports:
+      - "${BENCH_CH_HTTP_PORT:-18124}:8123"
+      - "${BENCH_CH_NATIVE_PORT:-19010}:9000"
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DB: enterprise_memory
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - ./seed:/docker-entrypoint-initdb.d:ro
+      - bench_ch_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  bench_ch_data:

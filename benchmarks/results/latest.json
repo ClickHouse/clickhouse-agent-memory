@@ -5,14 +5,12 @@
   "iterations": 50,
   "warmup": 5,
   "seed_row_counts": {
-    "agent_memory_long": 201,
+    "agent_memory_long": 203,
     "obs_events_stream": 200,
     "agent_memory_hot": 185,
-    "obs_incident_workspace": 181,
     "knowledge_base": 30,
     "sec_access": 12,
     "telco_elements": 12,
-    "telco_fault_workspace": 12,
     "telco_network_state": 12,
     "obs_dependencies": 11,
     "telco_connections": 11,
@@ -22,13 +20,15 @@
     "sec_events_stream": 8,
     "sec_users": 8,
     "telco_network_events": 7,
-    "sec_case_workspace": 5,
     "sec_historical_incidents": 5,
     "sec_threat_intel": 5,
-    "benchmark_writes": 0
+    "telco_fault_workspace": 4,
+    "benchmark_writes": 0,
+    "obs_incident_workspace": 0,
+    "sec_case_workspace": 0
   },
-  "ran_at": "2026-04-27T05:16:05Z",
-  "duration_s": 18.78,
+  "ran_at": "2026-04-27T07:33:49Z",
+  "duration_s": 17.66,
   "tools": [
     {
       "tool": "T1_scan_live_stream",
@@ -42,8 +42,8 @@
         18455
       ],
       "query_duration_ms_p50": 0.0,
-      "query_duration_ms_p95": 1.0,
-      "wallclock_ms_p50": 2.425,
+      "query_duration_ms_p95": 0.0,
+      "wallclock_ms_p50": 1.943,
       "result_rows_p50": 25,
       "params_used": {
         "service": "svc-notifications"
@@ -52,20 +52,20 @@
     {
       "tool": "T2_open_investigation",
       "iterations": 50,
-      "read_rows_p50": 181,
+      "read_rows_p50": 0,
       "read_rows_unique_values": [
-        181
+        0
       ],
-      "read_bytes_p50": 19546,
+      "read_bytes_p50": 0,
       "read_bytes_unique_values": [
-        19546
+        0
       ],
       "query_duration_ms_p50": 0.0,
-      "query_duration_ms_p95": 1.0,
-      "wallclock_ms_p50": 2.359,
-      "result_rows_p50": 181,
+      "query_duration_ms_p95": 0.0,
+      "wallclock_ms_p50": 1.934,
+      "result_rows_p50": 0,
       "params_used": {
-        "incident_id": "verify-test-001"
+        "incident_id": ""
       }
     },
     {
@@ -80,8 +80,8 @@
         23108
       ],
       "query_duration_ms_p50": 0.0,
-      "query_duration_ms_p95": 1.0,
-      "wallclock_ms_p50": 2.485,
+      "query_duration_ms_p95": 0.0,
+      "wallclock_ms_p50": 2.049,
       "result_rows_p50": 9,
       "params_used": {
         "session_id": "sess-203"
@@ -90,17 +90,17 @@
     {
       "tool": "T4_semantic_search",
       "iterations": 50,
-      "read_rows_p50": 199,
+      "read_rows_p50": 203,
       "read_rows_unique_values": [
-        199
+        203
       ],
-      "read_bytes_p50": 25479,
+      "read_bytes_p50": 25839,
       "read_bytes_unique_values": [
-        25479
+        25839
       ],
       "query_duration_ms_p50": 2.0,
-      "query_duration_ms_p95": 4.0,
-      "wallclock_ms_p50": 4.638,
+      "query_duration_ms_p95": 3.0,
+      "wallclock_ms_p50": 4.06,
       "result_rows_p50": 5,
       "params_used": {
         "user_id": "u-maruthi",
@@ -119,8 +119,8 @@
         394
       ],
       "query_duration_ms_p50": 1.0,
-      "query_duration_ms_p95": 1.0,
-      "wallclock_ms_p50": 2.452,
+      "query_duration_ms_p95": 2.0,
+      "wallclock_ms_p50": 2.368,
       "result_rows_p50": 1,
       "params_used": {
         "incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639"
@@ -129,18 +129,18 @@
     {
       "tool": "T6_replay_session",
       "iterations": 50,
-      "read_rows_p50": 181,
+      "read_rows_p50": 185,
       "read_rows_unique_values": [
-        181
+        185
       ],
-      "read_bytes_p50": 20046,
+      "read_bytes_p50": 20243,
       "read_bytes_unique_values": [
-        20046
+        20243
       ],
       "query_duration_ms_p50": 1.0,
-      "query_duration_ms_p95": 1.0,
-      "wallclock_ms_p50": 2.937,
-      "result_rows_p50": 14,
+      "query_duration_ms_p95": 2.0,
+      "wallclock_ms_p50": 2.789,
+      "result_rows_p50": 16,
       "params_used": {
         "session_id": ""
       }
@@ -157,8 +157,8 @@
         1
       ],
       "query_duration_ms_p50": 2.0,
-      "query_duration_ms_p95": 4.0,
-      "wallclock_ms_p50": 4.181,
+      "query_duration_ms_p95": 3.0,
+      "wallclock_ms_p50": 3.865,
       "result_rows_p50": 1,
       "params_used": {
         "user_id": "bench-user",
@@ -181,8 +181,8 @@
         1096
       ],
       "query_duration_ms_p50": 2.0,
-      "query_duration_ms_p95": 4.0,
-      "wallclock_ms_p50": 4.625,
+      "query_duration_ms_p95": 3.0,
+      "wallclock_ms_p50": 3.994,
       "result_rows_p50": 8,
       "params_used": {
         "service": "svc-api-gateway"

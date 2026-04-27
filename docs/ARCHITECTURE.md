@@ -26,7 +26,7 @@ Consolidate all three memory layers into a single ClickHouse cluster:
 | Semantic search at scale | Native HNSW vector indexes on Array(Float32) |
 | Structured filtering + analytics | Columnar storage, distributed SQL |
 | Graph traversal | Self-JOIN + UNION ALL on MergeTree edge tables (obs_dependencies, telco_connections, sec_access) |
-| Cost efficiency | Columnar compression (production-scale; demo data is too small to demonstrate) plus tiered storage to S3 |
+| Cost efficiency | Columnar compression (measured: 5-63x on structured columns at bench scale; see below) plus tiered storage to S3 |
 | Horizontal scaling | Distributed tables, sharding, replication |
 
 This eliminates the need for separate vector, graph, and cache databases. Measured against the matched stitched-stack reference implementation in `comparison/`:
@@ -40,6 +40,40 @@ This eliminates the need for separate vector, graph, and cache databases. Measur
 - **Cross-tier JOINs in one query:** yes vs no
 
 Reproduce: `cd comparison && make compare`.
+
+### Compression — measured
+
+Per-column compression ratios on `obs_historical_incidents` at bench scale (50,000 incidents, isolated cluster on :18124):
+
+| Column | Type | Uncompressed | Compressed | Ratio |
+|---|---|---|---|---|
+| `severity` | Enum8 | 48 KiB | 783 B | **63x** |
+| `ts` | DateTime64(3) | 385 KiB | 11 KiB | **34x** |
+| `description` | String (text) | 3.70 MiB | 602 KiB | 6.3x |
+| `title` | String (text) | 2.24 MiB | 376 KiB | 6.1x |
+| `affected_services` | Array(String) | 1.80 MiB | 303 KiB | 6.0x |
+| `resolution` | String (text) | 1.27 MiB | 231 KiB | 5.6x |
+| `root_cause` | String (text) | 1.34 MiB | 249 KiB | 5.5x |
+| `duration_min` | UInt32 | 192 KiB | 141 KiB | 1.4x |
+| `embedding` | Array(Float32) random | 144.91 MiB | 143.63 MiB | 1.0x |
+| `incident_id` | UUID (random) | 770 KiB | 774 KiB | 1.0x |
+
+The takeaway: column shape determines the ratio. Enums and timestamps compress 30-60x. Natural language text 5-7x. Random vectors and UUIDs are incompressible by design. Whole-table ratio is dominated by the largest column — for vector-heavy tables this is ~1.0x; strip the vector and the same table compresses ~6.6x.
+
+Reproduce: `cd benchmarks && make up && make seed && curl -u default:clickhouse "http://localhost:18124/?database=enterprise_memory" --data "SELECT column, formatReadableSize(sum(column_data_uncompressed_bytes)) AS u, formatReadableSize(sum(column_data_compressed_bytes)) AS c, round(sum(column_data_uncompressed_bytes)/sum(column_data_compressed_bytes), 2) AS ratio FROM system.parts_columns WHERE database='enterprise_memory' AND table='obs_historical_incidents' AND active GROUP BY column ORDER BY ratio DESC FORMAT PrettyCompact"`.
+
+### Bloom filter pruning — measured
+
+A/B test on `obs_historical_incidents` at bench scale (50k incidents, 13 partitions, 25 granules) with the bloom filter index `idx_incident_id`:
+
+| Run | rows read | bytes read | duration |
+|---|---|---|---|
+| WITH bloom filter | 665 | 10.4 KiB | 25 ms |
+| WITHOUT (`use_skip_indexes=0`) | 50,000 | 781 KiB | 4 ms |
+
+**Bloom prunes 98.67% of rows** on a UUID lookup. At this scale the data is in RAM so the full scan happens to win on latency (4 ms vs 25 ms — bloom-check overhead). The data-volume story is real and translates directly to fewer disk I/Os when the working set exceeds memory; the latency story flips at production scale where the full scan would hit storage.
+
+Reproduce: `cd benchmarks && make up && make seed`, then run the EXPLAIN + A/B in the verification-report at `docs/verification-report.md` § 9.
 
 ---
 

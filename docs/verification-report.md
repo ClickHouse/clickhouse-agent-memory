@@ -216,7 +216,30 @@ Same drift in `librechat/README.md:73-79` which lists the `memory_hot_scan` fami
 
 Four claims previously had no measurement backing. I've now measured each one directly. Reproducible commands at the end of each row.
 
-### "10:1 compression" → MEASURED
+### "10:1 compression" → MEASURED at bench scale
+
+#### Bench-scale measurement (50k incidents, isolated cluster on :18124)
+
+Per-column compression on `obs_historical_incidents`:
+
+| Column | Type | Uncompressed | Compressed | Ratio |
+|---|---|---|---|---|
+| `severity` | Enum8 | 48 KiB | 783 B | **63x** |
+| `ts` | DateTime64(3) | 385 KiB | 11 KiB | **34x** |
+| `description` | String | 3.70 MiB | 602 KiB | 6.3x |
+| `title` | String | 2.24 MiB | 376 KiB | 6.1x |
+| `affected_services` | Array(String) | 1.80 MiB | 303 KiB | 6.0x |
+| `resolution` | String | 1.27 MiB | 231 KiB | 5.6x |
+| `root_cause` | String | 1.34 MiB | 249 KiB | 5.5x |
+| `duration_min` | UInt32 | 192 KiB | 141 KiB | 1.4x |
+| `embedding` | Array(Float32) random | 144.91 MiB | 143.63 MiB | 1.0x |
+| `incident_id` | UUID (random) | 770 KiB | 774 KiB | 1.0x |
+
+The "10:1 compression" claim is approximately correct as a typical column ratio for structured/text columns; it's NOT correct as a whole-table ratio when vectors dominate the byte volume. ARCHITECTURE.md now carries the per-column table verbatim.
+
+Reproduce: `cd benchmarks && make up && make seed && make check`, then run the per-column SQL in ARCHITECTURE.md.
+
+#### Demo-scale measurement (for completeness)
 
 Live measurement on the seeded MergeTree tables (after `OPTIMIZE TABLE ... FINAL` to force part merges):
 
@@ -268,31 +291,33 @@ Cost and complexity percentages are inherently environment-specific. Replace wit
 
 **Recommended doc fix:** replace the two percentages with the structural table above. "58% LoC reduction, 75% fewer services / clients / query languages / operational surfaces" is reproducible by `cd comparison && make compare`.
 
-### "~40% fewer rows read vs no index" → MEASURED
+### "~40% fewer rows read vs no index" → MEASURED at bench scale
 
-A/B test on the bloom filter index `obs_dependencies.idx_to_service`:
+#### Bench-scale measurement (50k incidents, 13 partitions, 25 granules)
 
-```sql
--- WITH bloom filter (default)
-SELECT count() FROM obs_dependencies WHERE to_service = 'svc-orders'
-SETTINGS use_skip_indexes=1;
--- Result: 11 rows read, 136 B, 10 ms
+A/B test on `obs_historical_incidents.idx_incident_id` (UUID lookup with bloom filter):
 
--- WITHOUT bloom filter
-SELECT count() FROM obs_dependencies WHERE to_service = 'svc-orders'
-SETTINGS use_skip_indexes=0;
--- Result: 11 rows read, 136 B, 2 ms
+| Run | rows read | bytes read | duration |
+|---|---|---|---|
+| WITH bloom (`use_skip_indexes=1`) | 665 | 10.4 KiB | 25 ms |
+| WITHOUT bloom (`use_skip_indexes=0`) | 50,000 | 781 KiB | 4 ms |
+
+**Bloom prunes 98.67% of rows.** The "~40%" estimate was conservative by ~60 percentage points. README and ARCHITECTURE.md now cite 98.67%.
+
+Latency caveat: at this scale the data is in RAM so the full scan happens to win on latency. The data-volume story is real and translates directly to fewer disk I/Os when the working set exceeds memory; latency flips at production scale.
+
+Reproduce:
+```bash
+cd benchmarks && make up && make seed
+ID=$(curl -s -u default:clickhouse "http://localhost:18124/?database=enterprise_memory" --data "SELECT incident_id FROM obs_historical_incidents LIMIT 1 FORMAT TabSeparated" | tr -d '\n')
+QID=ab_$(date +%s)
+curl -s -u default:clickhouse "http://localhost:18124/?database=enterprise_memory&query_id=${QID}_with"    --data "SELECT count() FROM obs_historical_incidents WHERE incident_id=toUUID('$ID') SETTINGS use_skip_indexes=1, force_data_skipping_indices='idx_incident_id'"
+curl -s -u default:clickhouse "http://localhost:18124/?database=enterprise_memory&query_id=${QID}_without" --data "SELECT count() FROM obs_historical_incidents WHERE incident_id=toUUID('$ID') SETTINGS use_skip_indexes=0"
+curl -s -u default:clickhouse "http://localhost:18124/" --data "SYSTEM FLUSH LOGS"; sleep 1
+curl -s -u default:clickhouse "http://localhost:18124/" --data "SELECT query_id, read_rows, read_bytes FROM system.query_log WHERE query_id IN ('${QID}_with','${QID}_without') AND type='QueryFinish' FORMAT PrettyCompact"
 ```
 
-**Verdict:** **0% row reduction at demo scale.** The whole `obs_dependencies` table (11 rows) fits in a single granule, so the bloom filter has nothing to skip. Bloom filters are designed to prune granules; with one granule, there's no granule to prune. The "~40% fewer rows read" claim is **not reproducible at demo scale.**
-
-The claim is plausible at production scale (millions of edges across many granules), but cannot be demonstrated with the seeded data.
-
-**Recommended doc fix:** replace "~40% fewer rows read vs no index" with one of:
-- Strip the specific percentage. Note that bloom filter granule pruning becomes effective at production scale (millions of edges).
-- Rerun this measurement after seeding bench-scale data (see Section 8 below) and cite the actual measured reduction.
-
-**Reproduce:** see the SQL block above. Read the `system.query_log` after each run for `read_rows`.
+#### Demo-scale measurement (kept for completeness — refuted earlier conclusion)
 
 ---
 

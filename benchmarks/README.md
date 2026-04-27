@@ -138,25 +138,53 @@ git commit -m "bench: re-baseline after <reason>"
 Keep the reason explicit in the commit message. Baselines drift silently
 otherwise.
 
-## Scale note
+## Scale note — two modes
 
-The harness runs at the cookbook demo's seed scale: 200 live events, 8
-historical incidents, 10-12 graph nodes per domain. That is large enough to
-exercise every query path (HOT scan, WARM HNSW, GRAPH self-JOIN, INSERT) but
-small enough to run end to end in seconds.
+The harness ships with two scales:
 
-Two things this scale does not demonstrate:
+**Demo scale** (default, against the cookbook cluster on :18123). Tiny
+seed: 200 live events, 8 historical incidents, 10-12 graph nodes per
+domain. That exercises every query path (HOT scan, WARM HNSW, GRAPH
+self-JOIN, INSERT) but is too small to demonstrate compression ratios or
+bloom filter granule pruning.
 
-- ClickHouse columnar compression. At the demo's row counts most tables show
-  1.0-2.0x compression; vector-heavy tables show roughly 1.0x because Float32
-  embeddings do not compress. Compression ratios become meaningful at
-  production volumes (millions of rows).
-- Bloom filter granule pruning. The smallest tables fit in a single granule,
-  so the bloom filter has nothing to skip in an A/B test. Granule pruning
-  becomes effective once a table spans many granules.
+**Bench scale** (isolated cluster on :18124). Larger deterministic seed:
+100,000 events, 50,000 incidents (with 768-d vectors + HNSW), 50,000
+agent-memory rows, 40 services, 120 dependency edges. Big enough that
+the table spans 25+ granules so bloom filter pruning is observable, and
+the per-column compression ratios reach their natural shape (5-63x on
+structured columns; 1.0x on random vectors).
 
-If you need production-scale numbers, run this harness against a production
-ClickHouse cluster with your own data. The same query files apply.
+Bench scale uses deterministic embeddings (sha256-seeded numpy unit
+vectors) so seeding takes ~13 seconds with no API key. The vectors are
+not semantically meaningful but they exercise HNSW indexing and the
+same SQL query path as real embeddings.
+
+```bash
+# Bring up the isolated bench cluster on :18124
+cd benchmarks
+make up                      # docker compose up, schema applied via init script
+make seed                    # populates 100k events / 50k incidents / 50k memories
+make check                   # row counts + index status
+
+# Run the harness against the bench cluster
+make bench CH_HTTP=http://localhost:18124
+make report
+make diff CH_HTTP=http://localhost:18124   # vs baseline (re-baseline if needed)
+
+# Tear down
+make down                    # keeps the named volume
+```
+
+Override row counts via env vars:
+
+```bash
+N_EVENTS=1000000 N_INCIDENTS=200000 REBUILD=1 make seed
+```
+
+If you need production-scale numbers, run this harness against a
+production ClickHouse cluster with your own data. The same query files
+apply.
 
 ## Demo session report
 
