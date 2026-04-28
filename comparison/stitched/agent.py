@@ -241,7 +241,7 @@ class Neo4jClient:
             cypher = (
                 "MATCH (s:Service)-[r:DEPENDS_ON*1..2]->(t:Service {service_id: $target}) "
                 "RETURN s.service_id AS dependent_service, s.team AS team, "
-                "s.criticality AS criticality, length(r) AS hops"
+                "s.criticality AS criticality, size(r) AS hops"
             )
             with self._driver.session() as sess:
                 return [dict(rec) for rec in sess.run(cypher, target=target)]
@@ -357,10 +357,13 @@ def step2_create_workspace(redis_c: RedisClient, trigger: dict) -> str:
 
 def step3_vector_search_history(pine: PineconeClient, trigger: dict) -> list[dict]:
     print_step(3, 6, "Pinecone similarity query on historical incidents", "WARM")
+    # Redis returns all stream fields as strings; coerce latency to float.
+    _lat = trigger.get('latency_ms', 0) or 0
+    _lat = float(_lat) if isinstance(_lat, str) else _lat
     query_text = (f"{trigger.get('message', '')} "
                   f"error_code={trigger.get('error_code', '')} "
                   f"service={trigger.get('service', '')} "
-                  f"latency={trigger.get('latency_ms', 0):.0f}ms")
+                  f"latency={_lat:.0f}ms")
     vec = embed(query_text)
     t0 = time.perf_counter()
     matches = pine.query(vec, top_k=3)
