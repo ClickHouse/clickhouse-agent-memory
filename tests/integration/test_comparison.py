@@ -12,7 +12,7 @@ The clickhouse agent expects only ClickHouse, which the ch_client fixture
 already guarantees is reachable.
 
 HOT-window widening: the clickhouse agent defaults to `INTERVAL 10 MINUTE`
-for its "live incident" narrative. Tests widen that to 24 hours via the
+for its "live incident" narrative. Tests widen that to 7 days via the
 COMPARE_HOT_WINDOW_MINUTES env var so the assertion that at least one
 trigger event exists is robust to seed age. The test is not measuring
 freshness semantics; it is measuring that the end-to-end pipeline runs.
@@ -29,8 +29,9 @@ import pytest
 pytestmark = pytest.mark.integration
 
 # Widen the "live" window so the test is robust to seed age. Demo runs keep
-# the 10-minute default for the narrative; tests do not.
-os.environ.setdefault("COMPARE_HOT_WINDOW_MINUTES", "1440")
+# the 10-minute default for the narrative; tests do not. 7 days covers most
+# "seeded once, ran tests later in the week" workflows.
+os.environ.setdefault("COMPARE_HOT_WINDOW_MINUTES", "10080")
 
 
 # The keys the synthesis step returns from both agents.

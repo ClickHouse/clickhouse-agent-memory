@@ -59,29 +59,6 @@ LibreChat gives you the AI SRE preset wired to the `memory` MCP server. Every to
 
 ## Getting started in detail
 
-```mermaid
-flowchart LR
-    S([START]) --> CLONE[Clone repo]
-    CLONE --> CHOOSE{Which path?}
-    CHOOSE -->|CLI only| A1[cookbooks/ make setup]
-    CHOOSE -->|CLI + Chat UI| B1[project_final/ make setup]
-
-    A1 --> A2[make start]
-    A2 --> A3[make seed]
-    A3 --> A4[make run]
-    A4 --> DONE([Demos printed in terminal])
-
-    B1 --> B2[edit librechat/.env]
-    B2 --> B3[make all-up]
-    B3 --> B4[open localhost:3080]
-    B4 --> DONE2([Chat in LibreChat with AI SRE preset])
-
-    style S fill:#faff00,stroke:#1a1a1a,color:#1a1a1a
-    style DONE fill:#6be07a,stroke:#1a1a1a,color:#1a1a1a
-    style DONE2 fill:#6be07a,stroke:#1a1a1a,color:#1a1a1a
-    style CHOOSE fill:#f2b366,stroke:#1a1a1a,color:#1a1a1a
-```
-
 ### Prerequisites
 
 | Tool          | Version     | Why                                          |
@@ -113,7 +90,7 @@ flowchart TB
 
     CLIENTS --> MCP
 
-    MCP["FastMCP server<br/>streamable-http :13801<br/>8 typed tools"]
+    MCP["FastMCP server<br/>streamable-http :18765<br/>8 typed tools"]
 
     MCP --> CH[(ClickHouse 26.3 cluster<br/>enterprise_memory db)]
 
@@ -128,12 +105,6 @@ flowchart TB
     CH -.-> WARM
     CH -.-> GRAPH
 
-    subgraph COLD["COLD"]
-        S3[(S3 / GCS / ABS<br/>TTL-tiered archive)]
-    end
-
-    WARM -.TTL.-> S3
-
     style CLI fill:#1a1a1a,stroke:#b085dd,color:#fff
     style UI fill:#1a1a1a,stroke:#b085dd,color:#fff
     style AGENTS fill:#1a1a1a,stroke:#b085dd,color:#fff
@@ -142,10 +113,11 @@ flowchart TB
     style HOT fill:#faff00,stroke:#1a1a1a,color:#1a1a1a
     style WARM fill:#f2b366,stroke:#1a1a1a,color:#1a1a1a
     style GRAPH fill:#6be07a,stroke:#1a1a1a,color:#1a1a1a
-    style S3 fill:#333,stroke:#808080,color:#fff
 ```
 
 The agent talks to one endpoint. One cluster holds everything. Each tier is a ClickHouse table engine choice, not a separate piece of infrastructure.
+
+> **Cold tier note.** ClickHouse natively supports TTL-based tiering of MergeTree parts to S3, GCS, or ABS via storage policies. This demo does NOT configure that — every table lives on the cluster's local volume. To enable it in production, attach an object-store disk in `storage_config.xml` and add `TTL ts + INTERVAL 90 DAY TO VOLUME 'cold'` to the WARM tables. See `docs/ARCHITECTURE.md` for the rough shape.
 
 ### Why one cluster beats four databases
 

@@ -34,7 +34,7 @@ pytestmark = pytest.mark.integration
 # HOT: window replay
 # ---------------------------------------------------------------------------
 
-def test_memory_conversation_window_returns_chronological_turns(seeded):
+def test_list_session_messages_returns_chronological_turns(seeded):
     """sess-001 is a primary seeded session; window should return its turns."""
     env = list_session_messages(session_id="sess-001", n=20)
     assert env["tier"] == "HOT"
@@ -49,7 +49,7 @@ def test_memory_conversation_window_returns_chronological_turns(seeded):
     assert env["tier"] == "HOT"
 
 
-def test_memory_conversation_window_requires_session_id(seeded):
+def test_list_session_messages_requires_session_id(seeded):
     with pytest.raises(ValueError):
         list_session_messages(session_id="", n=20)
 
@@ -58,7 +58,7 @@ def test_memory_conversation_window_requires_session_id(seeded):
 # WARM: semantic recall
 # ---------------------------------------------------------------------------
 
-def test_memory_conversation_recall_finds_prior_turns(seeded):
+def test_get_conversation_history_finds_prior_turns(seeded):
     """u-maruthi has seeded turns on svc-payments pool issues."""
     env = get_conversation_history(
         user_id="u-maruthi",
@@ -75,12 +75,12 @@ def test_memory_conversation_recall_finds_prior_turns(seeded):
         assert "similarity_distance" in row
 
 
-def test_memory_conversation_recall_requires_user_id(seeded):
+def test_get_conversation_history_requires_user_id(seeded):
     with pytest.raises(ValueError):
         get_conversation_history(user_id="", query="anything", k=5)
 
 
-def test_memory_conversation_recall_requires_query(seeded):
+def test_get_conversation_history_requires_query(seeded):
     with pytest.raises(ValueError):
         get_conversation_history(user_id="u-maruthi", query="", k=5)
 
@@ -89,7 +89,7 @@ def test_memory_conversation_recall_requires_query(seeded):
 # WARM: distilled write
 # ---------------------------------------------------------------------------
 
-def test_memory_conversation_remember_records_agent_id(seeded):
+def test_add_memory_records_agent_id(seeded):
     """Regression test for the agent_id attribution fix.
 
     Previously agent_id defaulted to support-copilot regardless of what the
@@ -108,7 +108,7 @@ def test_memory_conversation_remember_records_agent_id(seeded):
     assert env["insights"]["persisted"] is True
 
 
-def test_memory_conversation_remember_validates_required_fields(seeded):
+def test_add_memory_validates_required_fields(seeded):
     # Empty user_id fails.
     with pytest.raises(ValueError):
         add_memory(user_id="", fact="anything")
@@ -126,7 +126,7 @@ def test_memory_conversation_remember_validates_required_fields(seeded):
 # Round-trip: remember -> recall
 # ---------------------------------------------------------------------------
 
-def test_memory_conversation_round_trip(seeded):
+def test_conversation_round_trip(seeded):
     """Write a distinctive fact, then recall it and confirm it is top-k.
 
     Uses a unique user_id per test invocation so repeated runs do not

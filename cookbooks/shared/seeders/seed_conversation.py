@@ -116,7 +116,7 @@ TOPICS = {
     "svc_payments_conn_pool": [
         ("user",      "I am seeing svc-payments throw DB_TIMEOUT across the board, started about 10 minutes ago."),
         ("assistant", "Pulling live errors from the HOT stream for svc-payments and checking for pool exhaustion patterns."),
-        ("tool",      "memory_hot_scan returned 34 ERROR rows on svc-payments, mostly DB_TIMEOUT from pod svc-payments-pod-3."),
+        ("tool",      "search_events returned 34 ERROR rows on svc-payments, mostly DB_TIMEOUT from pod svc-payments-pod-3."),
         ("assistant", "This looks like a connection pool exhaustion: similar incidents resolved by raising pool size from 50 to 200."),
         ("user",      "Can you confirm with the historical incidents? I do not want to just copy a runbook blindly."),
         ("assistant", "Running a WARM vector search over obs_historical_incidents for 'svc-payments database connection pool exhaustion'."),
@@ -127,7 +127,7 @@ TOPICS = {
     "payments_tls_cert": [
         ("user",      "svc-payments returning 503s again, clients reporting SSL handshake failures."),
         ("assistant", "Checking HOT stream for TLS_ERR rows on svc-payments."),
-        ("tool",      "memory_hot_scan returned 12 CRITICAL events, all error_code=TLS_ERR."),
+        ("tool",      "search_events returned 12 CRITICAL events, all error_code=TLS_ERR."),
         ("assistant", "Most likely cause is certificate expiry. The past incident on cert renewal matches this signature almost exactly."),
         ("user",      "Fine, rotate the cert. Also please add a reminder so we do not hit this again."),
         ("assistant", "Adding a 30-day pre-expiry alert via cert-manager. Documenting the fix in the knowledge base."),
@@ -136,7 +136,7 @@ TOPICS = {
     "auth_jwt_latency": [
         ("user",      "svc-auth p99 jumped to 2 seconds. api-gateway is timing out cascading into orders."),
         ("assistant", "Scanning HOT for WARN and ERROR on svc-auth in the last 15 minutes."),
-        ("tool",      "memory_hot_scan shows elevated JWT validation latency, cache hit rate dropped below 50%."),
+        ("tool",      "search_events shows elevated JWT validation latency, cache hit rate dropped below 50%."),
         ("assistant", "WARM vector search suggests the Redis public-key cache expired simultaneously and every pod is re-fetching."),
         ("user",      "Yeah this is the mass key-fetch pattern we hit before. What did we do last time?"),
         ("assistant", "Staggered cache TTL and added an in-process L1 key cache with 5 minute TTL. I can draft the config change."),
@@ -157,7 +157,7 @@ TOPICS = {
     "followup_conn_pool": [
         ("user",      "Following up on the svc-payments pool issue from a couple weeks ago. Has it recurred?"),
         ("assistant", "Let me check HOT for recent DB_TIMEOUT on svc-payments and recall our prior session."),
-        ("tool",      "memory_conversation_recall found your sess-001 transcript: raised pool from 50 to 200, added circuit breaker."),
+        ("tool",      "get_conversation_history found your sess-001 transcript: raised pool from 50 to 200, added circuit breaker."),
         ("assistant", "No recurrences in the last 30 days. The pool fix held. Circuit breaker has tripped twice, both times harmless."),
         ("user",      "Good, thanks. Please keep that SLO of 99.9 in mind, not 99.95."),
         ("assistant", "Confirming SLO 99.9 for svc-payments, no change from your previous instruction."),
@@ -165,7 +165,7 @@ TOPICS = {
     "blast_radius_search": [
         ("user",      "If svc-auth goes down what else breaks? I want the dependency picture before our DR drill."),
         ("assistant", "Running GRAPH traversal on obs_dependencies for svc-auth at 2 hops."),
-        ("tool",      "memory_graph_traverse: direct dependents svc-api-gateway and svc-payments, indirect svc-orders and svc-search."),
+        ("tool",      "find_related_entities: direct dependents svc-api-gateway and svc-payments, indirect svc-orders and svc-search."),
         ("assistant", "Four services in blast radius, three are critical. Your api-gateway and orders are both in the path."),
         ("user",      "That matches my mental model. Can you store that as a cached blast radius summary?"),
         ("assistant", "Recorded: svc-auth blast radius = api-gateway, payments, orders, search. Tagged for fast recall."),
@@ -176,7 +176,7 @@ TOPICS = {
         ("assistant", "Is the table append-heavy or also update heavy? Autovacuum behaviour is very different by workload."),
         ("user",      "Append-heavy, we keep 90 days then TTL out."),
         ("assistant", "For append-heavy, lower autovacuum_vacuum_insert_scale_factor and bump workers. Consider partitioning by month."),
-        ("tool",      "memory_conversation_recall found no prior Postgres context for this user, starting fresh."),
+        ("tool",      "get_conversation_history found no prior Postgres context for this user, starting fresh."),
         ("user",      "Partitioning by month is on my roadmap already. Focus on the autovacuum tuning for now."),
         ("assistant", "Proposed: autovacuum_vacuum_insert_scale_factor 0.02, autovacuum_max_workers 6, autovacuum_naptime 30s."),
         ("user",      "Good, I will apply that in staging tomorrow."),
@@ -184,7 +184,7 @@ TOPICS = {
     "slo_discussion": [
         ("user",      "We are negotiating an SLO for svc-payments with the business side. What have we historically hit?"),
         ("assistant", "Pulling historical incidents for svc-payments and converting duration_min to an availability window."),
-        ("tool",      "memory_warm_search returned three P1 incidents totalling 53 minutes over the last 9 months."),
+        ("tool",      "semantic_search returned three P1 incidents totalling 53 minutes over the last 9 months."),
         ("assistant", "That is roughly 99.988% availability actual, so 99.9% is safe and 99.95% is achievable with the pool fix holding."),
         ("user",      "Let us commit to 99.9 for now. I do not want to overpromise."),
         ("assistant", "Recorded: target SLO 99.9 for svc-payments checkout path, effective today."),
@@ -192,7 +192,7 @@ TOPICS = {
     "followup_auth_cache": [
         ("user",      "Did the svc-auth L1 cache change make it into prod?"),
         ("assistant", "Pulling the prior session and checking deployment status on the recent changes."),
-        ("tool",      "memory_conversation_recall: sess-003 covered staggered TTL plus 5-minute in-process cache."),
+        ("tool",      "get_conversation_history: sess-003 covered staggered TTL plus 5-minute in-process cache."),
         ("assistant", "Deploy landed 8 days ago. p99 now at 180ms steady, cache hit rate 94%. The issue has not recurred."),
         ("user",      "Excellent. Anything else you saw drifting in svc-auth?"),
         ("assistant", "One warning: the Redis primary has CPU at 68% average. Not urgent but worth a capacity review next sprint."),
@@ -203,7 +203,7 @@ TOPICS = {
         ("assistant", "How much bloat reduction are we seeing, and how often is autovacuum firing now?"),
         ("user",      "About 30% reduction in dead tuples, autovacuum fires roughly twice a day."),
         ("assistant", "That is the right shape but not aggressive enough. You can drop insert_scale_factor to 0.01 on that specific table."),
-        ("tool",      "memory_conversation_recall found sess-007 where we set 0.02, so this is a direct tightening."),
+        ("tool",      "get_conversation_history found sess-007 where we set 0.02, so this is a direct tightening."),
         ("assistant", "Recommended change: ALTER TABLE payments_txn SET (autovacuum_vacuum_insert_scale_factor = 0.01)."),
     ],
 }
@@ -273,7 +273,7 @@ KB_ARTICLES = [
     ("telco", "BGP flap diagnostics",
      "BGP flaps after upstream maintenance are usually MTU mismatches. Confirm MTU on both sides before escalating to the upstream provider."),
     ("process", "Handing work between sessions",
-     "Every agent should call memory_conversation_recall at session start, then memory_conversation_remember on any new preference or decision."),
+     "Every agent should call get_conversation_history at session start, then add_memory on any new preference or decision."),
 ]
 
 

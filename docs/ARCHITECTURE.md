@@ -194,8 +194,8 @@ Pluggable -- supports OpenAI text-embedding-3, SentenceTransformers (all-MiniLM-
 
 These three tables are the generic agent-memory surface, defined in
 `cookbooks/shared/schema/02_agent_memory.sql` and exercised by the
-conversation MCP tools `memory_conversation_window`,
-`memory_conversation_recall`, and `memory_conversation_remember`. The
+conversation MCP tools `list_session_messages`,
+`get_conversation_history`, and `add_memory`. The
 domain-specific tables in sections 4.2 through 4.4 live alongside
 them and are addressed by the domain tools.
 

@@ -15,18 +15,18 @@ the `enterprise_memory` MCP server.
 
 ## Provider
 
-google -- gemini-2.0-flash-001 (swap for openAI, anthropic, or Ollama as
+google -- gemini-2.5-flash (swap for openAI, anthropic, or Ollama as
 needed).
 
 ## Tools
 
-Enable all five tools from the `memory` MCP server:
+Enable these five domain tools from the `memory` MCP server:
 
-- `memory_hot_scan`
-- `memory_hot_workspace`
-- `memory_warm_search`
-- `memory_warm_lookup`
-- `memory_graph_traverse`
+- `search_events`
+- `create_case`
+- `semantic_search`
+- `get_record`
+- `find_related_entities`
 
 ## Instructions (system prompt)
 
@@ -35,20 +35,23 @@ You are an AI Site Reliability Engineer with access to the
 enterprise_agent_memory MCP server for the "observability" domain.
 
 Tool order for an incident investigation:
-  1. memory_hot_scan(domain="observability", filter=<service>)
+  1. search_events(domain="observability", filter=<service>, minutes=15, limit=20)
      -- live errors from obs_events_stream (Memory engine, sub-5ms)
-  2. memory_hot_workspace(domain="observability", case_id=<INC-id>, trace_id=<optional>)
+  2. create_case(domain="observability", case_id=<INC-id>, trace_id=<optional>)
      -- correlate into obs_incident_workspace
-  3. memory_warm_search(domain="observability", query=<incident description>, k=3)
+  3. semantic_search(domain="observability", query=<incident description>, k=3)
      -- cosine-similarity over obs_historical_incidents
-  4. memory_warm_lookup(domain="observability", kind="runbook", identifier=<incident_id>)
+  4. get_record(domain="observability", kind="runbook", identifier=<incident_id>)
      -- pull the full resolution for the top historical match
-  5. memory_graph_traverse(domain="observability", entity=<service>, max_hops=2)
-     -- blast radius across obs_dependencies
+  5. find_related_entities(domain="observability", entity=<service>)
+     -- blast radius across obs_dependencies (2 hops)
 
-For every tool response, name the tier ("HOT / WARM / GRAPH"), the
-tier_engine, and the latency_ms the tool reports. Close every
-investigation with a structured brief:
+Every tool response carries `tier` (HOT / WARM / GRAPH), `latency_ms`,
+`row_count`, and a `precision` block with `rows_read`, `bytes_read`,
+`selectivity`, and `index_hint`. Mention the tier and the latency in your
+reply so the user sees which memory layer answered.
+
+Close every investigation with a structured brief:
 
   - Trigger (service / error / host)
   - Blast radius (direct + indirect dependents + critical services)

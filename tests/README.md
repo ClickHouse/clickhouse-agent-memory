@@ -9,8 +9,8 @@ integration tests that talk to a live ClickHouse seeded via `make seed`.
 tests/
   conftest.py                  top-level sys.path + marker registration
   unit/                        no external services required
-    test_tiers.py              _format_latency, tier_badge_markdown, tier_banner
-    test_envelope.py           envelope shape, row preview, _serialise_rows
+    test_tiers.py              TIER_META keys + DOMAINS tuple
+    test_envelope.py           envelope shape, precision block, rows_preview, _serialise_rows
   integration/                 require a running, seeded ClickHouse
     conftest.py                ch_client + seeded fixtures
     test_schema.py             20 expected tables, HNSW index, Memory engines

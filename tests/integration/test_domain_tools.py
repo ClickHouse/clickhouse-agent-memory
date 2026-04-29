@@ -41,7 +41,7 @@ DOMAINS = ("observability", "telco", "cybersecurity")
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("domain", DOMAINS)
-def test_memory_hot_scan_returns_hot_envelope(seeded, domain):
+def test_search_events_returns_hot_envelope(seeded, domain):
     """Scan the live stream for each domain and assert the envelope shape."""
     env = search_events(domain=domain, limit=5)
     assert env["tier"] == "HOT"
@@ -56,14 +56,14 @@ def test_memory_hot_scan_returns_hot_envelope(seeded, domain):
 
 
 @pytest.mark.parametrize("domain", DOMAINS)
-def test_memory_hot_scan_with_filter_does_not_raise(seeded, domain):
+def test_search_events_with_filter_does_not_raise(seeded, domain):
     """A filter value should not crash the tool even if it matches no rows."""
     env = search_events(domain=domain, filter="no-such-entity-zzz", limit=5)
     assert env["tier"] == "HOT"
     assert env["row_count"] >= 0
 
 
-def test_memory_hot_scan_rejects_unknown_domain(seeded):
+def test_search_events_rejects_unknown_domain(seeded):
     with pytest.raises(ValueError):
         search_events(domain="not-a-domain")
 
@@ -73,7 +73,7 @@ def test_memory_hot_scan_rejects_unknown_domain(seeded):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("domain", DOMAINS)
-def test_memory_hot_workspace_builds_grouped_summary(seeded, domain):
+def test_create_case_builds_grouped_summary(seeded, domain):
     """Materialise a case workspace and assert the envelope + insights."""
     case_id = f"TEST-123-{domain}"
     env = create_case(domain=domain, case_id=case_id)
@@ -90,7 +90,7 @@ def test_memory_hot_workspace_builds_grouped_summary(seeded, domain):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("domain", DOMAINS)
-def test_memory_warm_search_returns_similarity_ranked_rows(seeded, domain):
+def test_semantic_search_returns_similarity_ranked_rows(seeded, domain):
     """Top-k vector search returns at most k rows, each with a distance score."""
     env = semantic_search(domain=domain, query="connection pool", k=3)
     assert env["tier"] == "WARM"
@@ -102,7 +102,7 @@ def test_memory_warm_search_returns_similarity_ranked_rows(seeded, domain):
         assert "similarity_distance" in row
 
 
-def test_memory_warm_search_rejects_unknown_domain(seeded):
+def test_semantic_search_rejects_unknown_domain(seeded):
     with pytest.raises(ValueError):
         semantic_search(domain="alien-domain", query="anything", k=3)
 
@@ -111,7 +111,7 @@ def test_memory_warm_search_rejects_unknown_domain(seeded):
 # WARM: get_record
 # ---------------------------------------------------------------------------
 
-def test_memory_warm_lookup_observability_runbook(seeded, ch_client):
+def test_get_record_observability_runbook(seeded, ch_client):
     """Pull a real seeded incident_id first, then ensure runbook lookup finds it."""
     result = ch_client.query(
         "SELECT incident_id FROM enterprise_memory.obs_historical_incidents LIMIT 1"
@@ -130,7 +130,7 @@ def test_memory_warm_lookup_observability_runbook(seeded, ch_client):
     assert "resolution" in env["insights"]
 
 
-def test_memory_warm_lookup_cybersecurity_threat_intel(seeded):
+def test_get_record_cybersecurity_threat_intel(seeded):
     """Threat-intel search over FIN6 should return at least one match."""
     env = get_record(
         domain="cybersecurity",
@@ -143,7 +143,7 @@ def test_memory_warm_lookup_cybersecurity_threat_intel(seeded):
     assert env["row_count"] >= 1
 
 
-def test_memory_warm_lookup_rejects_unsupported_pair(seeded):
+def test_get_record_rejects_unsupported_pair(seeded):
     # observability does not support threat_intel lookup.
     with pytest.raises(ValueError):
         get_record(
@@ -151,12 +151,12 @@ def test_memory_warm_lookup_rejects_unsupported_pair(seeded):
         )
 
 
-def test_memory_warm_lookup_runbook_requires_identifier(seeded):
+def test_get_record_runbook_requires_identifier(seeded):
     with pytest.raises(ValueError):
         get_record(domain="observability", kind="runbook")
 
 
-def test_memory_warm_lookup_threat_intel_requires_query(seeded):
+def test_get_record_threat_intel_requires_query(seeded):
     with pytest.raises(ValueError):
         get_record(
             domain="cybersecurity", kind="threat_intel", query=""
@@ -176,7 +176,7 @@ GRAPH_CASES = [
 
 
 @pytest.mark.parametrize("domain,entity", GRAPH_CASES)
-def test_memory_graph_traverse_returns_neighbours(seeded, domain, entity):
+def test_find_related_entities_returns_neighbours(seeded, domain, entity):
     """Each seeded entity should have at least one reachable neighbour."""
     env = find_related_entities(domain=domain, entity=entity, max_hops=2)
     assert env["tier"] == "GRAPH"
@@ -191,11 +191,11 @@ def test_memory_graph_traverse_returns_neighbours(seeded, domain, entity):
     assert "indirect_neighbours" in env["insights"]
 
 
-def test_memory_graph_traverse_requires_entity(seeded):
+def test_find_related_entities_requires_entity(seeded):
     with pytest.raises(ValueError):
         find_related_entities(domain="observability", entity="", max_hops=2)
 
 
-def test_memory_graph_traverse_rejects_unknown_domain(seeded):
+def test_find_related_entities_rejects_unknown_domain(seeded):
     with pytest.raises(ValueError):
         find_related_entities(domain="martian", entity="anything", max_hops=1)
