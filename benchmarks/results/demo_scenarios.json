@@ -1,16 +1,16 @@
 {
-  "ran_at": "2026-04-27T05:11:54Z",
+  "ran_at": "2026-04-29T06:18:09Z",
   "ch_version": "26.3.9.8",
   "ch_http": "http://localhost:18123",
   "database": "enterprise_memory",
   "canonical_service": "svc-orders",
   "canonical_user": "u-maruthi",
   "canonical_domain": "observability",
-  "canonical_incident_id": "453bbaff-5bef-4774-92c4-4ba9b1b73639",
+  "canonical_incident_id": "d03c4742-5489-4015-8271-7d55d36d2ffb",
   "iterations": 25,
   "warmup": 3,
   "sql_source": "cookbooks/mcp_server/queries.py (live MCP templates, same as production)",
-  "duration_s": 7.92,
+  "duration_s": 9.11,
   "scenarios": [
     {
       "demo": 1,
@@ -52,9 +52,9 @@
       "sql_rendered": "-- WARM tier: SEMANTIC SEARCH over past observability incidents.\n        -- `embedding` is Array(Float32). cosineDistance returns 0 for an\n        -- identical vector and 2 for the opposite direction, so LOWER is\n        -- more similar. The HNSW index makes the ORDER BY LIMIT k fast.\n        --\n        -- Filter-first, rank-second: the ts window prunes whole monthly\n        -- partitions (PARTITION BY toYYYYMM(ts)) before HNSW sees a single\n        -- row. Rule: query-join-filter-before (filter before the expensive\n        -- op \u2014 here the expensive op is HNSW rank, not a JOIN).\n        SELECT incident_id, ts, title, affected_services,\n               root_cause, resolution,\n               toString(severity) AS severity, duration_min,\n               -- Rounded copy for display; the un-rounded form drives the sort.\n               round(cosineDistance(embedding, [\u2026768-d query vector\u2026]), 4) AS similarity_distance\n        FROM enterprise_memory.obs_historical_incidents\n        WHERE ts >= now() - INTERVAL {days:UInt32} DAY\n        -- ORDER BY uses the un-rounded distance so the HNSW index kicks in.\n        ORDER BY cosineDistance(embedding, [\u2026768-d query vector\u2026]) ASC\n        LIMIT {k:UInt32}",
       "iterations": 25,
       "read_rows_p50": 14,
-      "read_bytes_p50": 26398,
-      "query_duration_ms_p50": 3.0,
-      "query_duration_ms_p95": 5.0,
+      "read_bytes_p50": 26402,
+      "query_duration_ms_p50": 4.0,
+      "query_duration_ms_p95": 6.0,
       "result_rows_p50": 5
     },
     {
@@ -76,7 +76,7 @@
       "read_rows_p50": 32,
       "read_bytes_p50": 922,
       "query_duration_ms_p50": 3.0,
-      "query_duration_ms_p95": 4.0,
+      "query_duration_ms_p95": 6.0,
       "result_rows_p50": 2
     },
     {
@@ -115,10 +115,10 @@
       "source": "WARM_VECTOR_SQL['observability']",
       "sql_rendered": "-- WARM tier: SEMANTIC SEARCH over past observability incidents.\n        -- `embedding` is Array(Float32). cosineDistance returns 0 for an\n        -- identical vector and 2 for the opposite direction, so LOWER is\n        -- more similar. The HNSW index makes the ORDER BY LIMIT k fast.\n        --\n        -- Filter-first, rank-second: the ts window prunes whole monthly\n        -- partitions (PARTITION BY toYYYYMM(ts)) before HNSW sees a single\n        -- row. Rule: query-join-filter-before (filter before the expensive\n        -- op \u2014 here the expensive op is HNSW rank, not a JOIN).\n        SELECT incident_id, ts, title, affected_services,\n               root_cause, resolution,\n               toString(severity) AS severity, duration_min,\n               -- Rounded copy for display; the un-rounded form drives the sort.\n               round(cosineDistance(embedding, [\u2026768-d query vector\u2026]), 4) AS similarity_distance\n        FROM enterprise_memory.obs_historical_incidents\n        WHERE ts >= now() - INTERVAL {days:UInt32} DAY\n        -- ORDER BY uses the un-rounded distance so the HNSW index kicks in.\n        ORDER BY cosineDistance(embedding, [\u2026768-d query vector\u2026]) ASC\n        LIMIT {k:UInt32}",
       "iterations": 25,
-      "read_rows_p50": 12,
-      "read_bytes_p50": 25868,
+      "read_rows_p50": 13,
+      "read_bytes_p50": 26146,
       "query_duration_ms_p50": 3.0,
-      "query_duration_ms_p95": 4.0,
+      "query_duration_ms_p95": 9.0,
       "result_rows_p50": 3
     },
     {
@@ -129,14 +129,14 @@
       "step": "3/4",
       "sub_intent": "hydrate top match (runbook + resolution)",
       "params": {
-        "identifier": "453bbaff-5bef-4774-92c4-4ba9b1b73639"
+        "identifier": "d03c4742-5489-4015-8271-7d55d36d2ffb"
       },
       "source": "WARM_LOOKUP_SQL[('observability','runbook')]",
       "sql_rendered": "-- WARM tier: FETCH A RUNBOOK BY ID.\n        -- Deterministic lookup: no vector math, just the full\n        -- historical incident row so the agent can quote the resolution.\n        SELECT incident_id, title, root_cause, resolution,\n               duration_min, toString(severity) AS severity, affected_services\n        FROM enterprise_memory.obs_historical_incidents\n        WHERE incident_id = {identifier:String}",
       "iterations": 25,
-      "read_rows_p50": 1,
-      "read_bytes_p50": 283,
-      "query_duration_ms_p50": 0.0,
+      "read_rows_p50": 2,
+      "read_bytes_p50": 561,
+      "query_duration_ms_p50": 1.0,
       "query_duration_ms_p95": 1.0,
       "result_rows_p50": 1
     },
@@ -156,8 +156,8 @@
       "iterations": 25,
       "read_rows_p50": 32,
       "read_bytes_p50": 922,
-      "query_duration_ms_p50": 2.0,
-      "query_duration_ms_p95": 3.0,
+      "query_duration_ms_p50": 3.0,
+      "query_duration_ms_p95": 5.0,
       "result_rows_p50": 2
     }
   ]

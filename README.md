@@ -284,7 +284,7 @@ sequenceDiagram
     end
 
     A->>U: synthesized brief:<br/>what's happening, what's similar,<br/>what's downstream
-    Note over U,CH: 245 rows · 54.0 KB · 6 ms total<br/>one cluster, one auth, one bill
+    Note over U,CH: 247 rows · 54.5 KB · 8 ms total<br/>one cluster, one auth, one bill
 ```
 
 ---
@@ -377,9 +377,11 @@ flowchart TB
 | Demo            | Tool call                     | Rows | Bytes    | p50 latency |
 |-----------------|-------------------------------|------|----------|-------------|
 | 1 · HOT         | `search_events`               | 200  | 27.5 KB  | 1 ms        |
-| 2 · WARM        | `semantic_search`             | 14   | 25.8 KB  | 3 ms        |
+| 2 · WARM        | `semantic_search`             | 14   | 25.8 KB  | 4 ms        |
 | 3 · GRAPH       | `find_related_entities`       | 32   | 0.9 KB   | 3 ms        |
-| 4 · MIXED       | all four tool calls           | 245  | 54.0 KB  | 6 ms total  |
+| 4 · MIXED       | all four tool calls           | 247  | 54.5 KB  | 8 ms total  |
+
+> **Number-stability note.** Row and byte counts are deterministic per seed (the seeder uses `SEED=42`). Latencies vary ±1-2 ms run-to-run with CPU and cache warmth, and Demo 4's mix can shift by 1-2 rows because vector-similarity ties sometimes return slightly different result counts. The full machine-readable report — re-generated every time you run the harness — is at `benchmarks/results/demo_scenarios.md`.
 
 Full walk-through with the exact agent prompts, tool calls, and rendered envelopes: [`docs/demo-script.md`](docs/demo-script.md).
 
